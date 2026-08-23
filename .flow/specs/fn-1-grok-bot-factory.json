@@ -9,7 +9,7 @@
   "depends_on_epics": [],
   "id": "fn-1-grok-bot-factory",
   "impl_review_rounds": {
-    "fn-1-grok-bot-factory.1": 1
+    "fn-1-grok-bot-factory.1": 0
   },
   "next_task": 1,
   "plan_review_rounds": 0,
@@ -430,14 +430,104 @@
       "timestamp": "2026-08-23T22:03:16.190522Z",
       "tool_calls": 9,
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "3066eeb6aa9b8b9c117012bf696259f753446fd2b7a7cfa515d7d8462001ec57",
+      "backend": "codex",
+      "base_sha": "e45dbb5d75359496fb945e2a056482e07fb752ae",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "classification": "introduced",
+            "findingId": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-e3067472b3e95b3f127276eefe86306d",
+            "classification": "introduced",
+            "findingId": "finding-e3067472b3e95b3f127276eefe86306d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "classification": "introduced",
+            "findingId": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-33431264ddc82ad2390b41705b2cc625",
+            "classification": "introduced",
+            "findingId": "finding-33431264ddc82ad2390b41705b2cc625",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "da15325400012c7bc390c1ffb8664f0ca8e57e9d",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1023,
+      "output_sha256": "946cafe93ec705381821920e2e90e0d18b0a90044f7540a2fd21aa3a2e53dd80",
+      "reservation_id": "8ccf1f59b1ec47f9a0070f7ab55ae0bd",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.1",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.1",
+      "timestamp": "2026-08-23T22:09:32.725387Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:fn-1-grok-bot-factory.1": 1,
     "plan": 1,
     "plan#completion": 0
   },
-  "review_pending_rounds": {},
-  "review_reservations": {},
+  "review_pending_rounds": {
+    "impl:fn-1-grok-bot-factory.1": 2
+  },
+  "review_reservations": {
+    "426fd31accb0465e88a70653fbf2c295": {
+      "artifact_sha256": "3066eeb6aa9b8b9c117012bf696259f753446fd2b7a7cfa515d7d8462001ec57",
+      "counter_scope": "impl:fn-1-grok-bot-factory.1",
+      "epoch": 0,
+      "forced": false,
+      "review_type": "impl",
+      "superseded_by": "8ccf1f59b1ec47f9a0070f7ab55ae0bd",
+      "superseded_epoch": 1
+    },
+    "cb40f69cc0e64edcb656c968b6d5fc8d": {
+      "artifact_sha256": null,
+      "counter_scope": "impl:fn-1-grok-bot-factory.1",
+      "epoch": 0,
+      "forced": false,
+      "review_type": "impl",
+      "superseded_by": "8ccf1f59b1ec47f9a0070f7ab55ae0bd",
+      "superseded_epoch": 1
+    }
+  },
   "review_transport_failures": {
     "impl:fn-1-grok-bot-factory.1": 0,
     "plan": 0
@@ -456,5 +546,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-23T22:03:16.196968Z"
+  "updated_at": "2026-08-23T22:09:32.730080Z"
 }
