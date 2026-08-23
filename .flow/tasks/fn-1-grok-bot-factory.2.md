@@ -52,6 +52,7 @@ Isolated per-tick worktree runner with instance host CLI probe (/loop or /goal) 
 
 baseline: green (tests/factory/gate.test.sh)
 stage: impl-review - ran [2026-08-23 NEEDS_WORK .. 2026-08-23T22:40:46Z SHIP]
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
 - Commits: c9feddde063f553b31d28308668dc8101709ece2, ecb2e0016ca58b714527aae6be82f9b0dc048743, 267798f4d862e51b0e0f012762b0fd6fe0863b3f
 - Tests: tests/factory/gate.test.sh, tests/factory/tick.test.sh
