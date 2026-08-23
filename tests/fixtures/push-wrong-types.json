@@ -1,8 +1,8 @@
 {
-  "ref": "refs/heads/master",
-  "after": 123,
-  "deleted": false,
+  "ref": 1,
+  "after": "0123456789abcdef0123456789abcdef01234567",
+  "deleted": "yes",
   "repository": {
-    "full_name": "acme/widget"
+    "full_name": "acme/app"
   }
 }

@@ -1,7 +1,7 @@
 {
   "ref": "refs/heads/tmp",
-  "after": "0123456789abcdef0123456789abcdef01234567",
-  "deleted": true,
+  "after": "0000000000000000000000000000000000000000",
+  "deleted": false,
   "repository": {
     "full_name": "acme/app"
   }

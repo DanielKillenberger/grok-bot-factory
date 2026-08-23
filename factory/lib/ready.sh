@@ -1,40 +1,58 @@
 # Read .flow/specs/*.json and .flow/tasks/*.json at after via gh api.
 # Queue only ready:true. Classify land vs pilot. Never writes ready.
 
+_factory_b64d() {
+  local data
+  data=$(tr -d '\n\r ')
+  printf '%s' "$data" | base64 -d 2>/dev/null || printf '%s' "$data" | base64 -D
+}
+
 _factory_list_json_dir() {
-  local owner="$1" repo="$2" path="$3" after="$4" body
-  if ! body=$(_factory_gh api --method GET "repos/${owner}/${repo}/contents/${path}" -f ref="$after"); then
-    case "${FACTORY_GH_CLASS:-transport}" in
-      404)
-        printf '%s\n' "[]"
-        return 0
-        ;;
-      *)
-        printf '%s\n' "ready: ${FACTORY_GH_CLASS} listing ${path}" >&2
-        return 2
-        ;;
-    esac
-  fi
+  local owner="$1" repo="$2" path="$3" after="$4" body rc
+  rc=0
+  body=$(_factory_gh api --method GET "repos/${owner}/${repo}/contents/${path}" -f ref="$after") || rc=$?
+  case "$rc" in
+    0) ;;
+    11)
+      printf '%s\n' "[]"
+      return 0
+      ;;
+    *)
+      printf '%s\n' "ready: gh rc ${rc} listing ${path}" >&2
+      return 2
+      ;;
+  esac
   if ! printf '%s\n' "$body" | jq -e 'type=="array"' >/dev/null 2>&1; then
     printf '%s\n' "ready: partial or non-directory listing for ${path}" >&2
     return 2
   fi
+  if ! printf '%s\n' "$body" | jq -e '
+    all(type=="object"
+        and (.name|type=="string")
+        and (.type|type=="string")
+        and (.type|IN("file","dir","symlink","submodule")))
+  ' >/dev/null 2>&1; then
+    printf '%s\n' "ready: malformed directory listing for ${path}" >&2
+    return 2
+  fi
   printf '%s\n' "$body" | jq -c '
-    [.[] | select(.type=="file" and (.name|type=="string") and (.name|test("^[A-Za-z0-9._-]+\\.json$"))) | .name]
+    [.[] | select(.type=="file" and (.name|test("^[A-Za-z0-9._-]+\\.json$"))) | .name]
   '
 }
 
 _factory_get_json_file() {
-  local owner="$1" repo="$2" path="$3" after="$4" body content
-  if ! body=$(_factory_gh api --method GET "repos/${owner}/${repo}/contents/${path}" -f ref="$after"); then
-    printf '%s\n' "ready: ${FACTORY_GH_CLASS} reading ${path}" >&2
+  local owner="$1" repo="$2" path="$3" after="$4" body content rc
+  rc=0
+  body=$(_factory_gh api --method GET "repos/${owner}/${repo}/contents/${path}" -f ref="$after") || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    printf '%s\n' "ready: gh rc ${rc} reading ${path}" >&2
     return 2
   fi
   if ! printf '%s\n' "$body" | jq -e 'type=="object" and .encoding=="base64" and (.content|type=="string")' >/dev/null 2>&1; then
     printf '%s\n' "ready: malformed contents object for ${path}" >&2
     return 2
   fi
-  content=$(printf '%s\n' "$body" | jq -r '.content' | tr -d '\n' | base64 -d 2>/dev/null) || {
+  content=$(printf '%s\n' "$body" | jq -r '.content' | _factory_b64d) || {
     printf '%s\n' "ready: base64 decode failed for ${path}" >&2
     return 2
   }
@@ -46,7 +64,6 @@ _factory_get_json_file() {
 }
 
 _factory_ready_bool() {
-  # stdout true|false|bad
   printf '%s\n' "$1" | jq -r '
     if has("ready") | not then "false"
     elif (.ready|type)=="boolean" then (if .ready then "true" else "false" end)
@@ -56,9 +73,11 @@ _factory_ready_bool() {
 }
 
 _factory_open_pr() {
-  local full_name="$1" branch="$2" body
-  if ! body=$(_factory_gh pr list --repo "$full_name" --head "$branch" --state open --json number --limit 10); then
-    printf '%s\n' "ready: ${FACTORY_GH_CLASS} listing PRs for ${full_name} head ${branch}" >&2
+  local owner="$1" repo="$2" branch="$3" body rc
+  rc=0
+  body=$(_factory_gh api --method GET "repos/${owner}/${repo}/pulls" -f state=open -f "head=${owner}:${branch}" -f per_page=5) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    printf '%s\n' "ready: gh rc ${rc} listing PRs for ${owner}/${repo} head ${branch}" >&2
     return 2
   fi
   if ! printf '%s\n' "$body" | jq -e 'type=="array"' >/dev/null 2>&1; then
@@ -72,9 +91,9 @@ _factory_open_pr() {
 }
 
 _factory_classify_spec() {
-  # args: spec_json, tasks_json_array (concatenated objects as JSON array)
-  # prints land|pilot|unclassifiable
-  local spec="$1" tasks="$2" spec_id branch statuses rc
+  # args: spec_json, tasks_json_array
+  # prints land|pilot|unclassifiable; return 2 if PR lookup is stuck
+  local spec="$1" tasks="$2" spec_id branch statuses pr_rc owner repo
   spec_id=$(printf '%s\n' "$spec" | jq -r '.id // empty')
   if [ -z "$spec_id" ] || [ "$(printf '%s\n' "$spec" | jq -r '.id|type')" != "string" ]; then
     printf '%s\n' unclassifiable
@@ -98,11 +117,13 @@ _factory_classify_spec() {
         printf '%s\n' unclassifiable
         return 0
       fi
-      rc=0
-      _factory_open_pr "$FACTORY_FULL_NAME" "$branch" || rc=$?
-      if [ "$rc" -eq 2 ]; then
+      owner="${FACTORY_FULL_NAME%%/*}"
+      repo="${FACTORY_FULL_NAME#*/}"
+      pr_rc=0
+      _factory_open_pr "$owner" "$repo" "$branch" || pr_rc=$?
+      if [ "$pr_rc" -eq 2 ]; then
         return 2
-      elif [ "$rc" -eq 0 ]; then
+      elif [ "$pr_rc" -eq 0 ]; then
         printf '%s\n' land
       else
         printf '%s\n' pilot
@@ -125,10 +146,20 @@ ready_select() {
   spec_names=$(_factory_list_json_dir "$owner" "$repo" ".flow/specs" "$after") || return 2
   task_names=$(_factory_list_json_dir "$owner" "$repo" ".flow/tasks" "$after") || return 2
 
+  if ! printf '%s\n' "$spec_names" | jq -e 'type=="array"' >/dev/null 2>&1; then
+    printf '%s\n' "ready: malformed spec listing" >&2
+    return 2
+  fi
+  if ! printf '%s\n' "$task_names" | jq -e 'type=="array"' >/dev/null 2>&1; then
+    printf '%s\n' "ready: malformed task listing" >&2
+    return 2
+  fi
+
   specs_json='[]'
   tasks_json='[]'
 
-  for name in $(printf '%s\n' "$spec_names" | jq -r '.[]'); do
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
     body=$(_factory_get_json_file "$owner" "$repo" ".flow/specs/${name}" "$after") || return 2
     ready=$(_factory_ready_bool "$body")
     if [ "$ready" = "bad" ]; then
@@ -136,9 +167,10 @@ ready_select() {
       return 2
     fi
     specs_json=$(jq -c --argjson s "$body" '. + [$s]' <<<"$specs_json")
-  done
+  done < <(printf '%s\n' "$spec_names" | jq -r '.[]')
 
-  for name in $(printf '%s\n' "$task_names" | jq -r '.[]'); do
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
     body=$(_factory_get_json_file "$owner" "$repo" ".flow/tasks/${name}" "$after") || return 2
     ready=$(_factory_ready_bool "$body")
     if [ "$ready" = "bad" ]; then
@@ -146,7 +178,7 @@ ready_select() {
       return 2
     fi
     tasks_json=$(jq -c --argjson s "$body" '. + [$s]' <<<"$tasks_json")
-  done
+  done < <(printf '%s\n' "$task_names" | jq -r '.[]')
 
   local spec
   while IFS= read -r spec; do
@@ -166,7 +198,12 @@ ready_select() {
     [ -z "$task" ] && continue
     ready=$(_factory_ready_bool "$task")
     [ "$ready" = "true" ] || continue
-    if [ "$(printf '%s\n' "$task" | jq -r '.id|type')" != "string" ]; then
+    if ! printf '%s\n' "$task" | jq -e '
+      (.id|type=="string")
+      and (.spec|type=="string")
+      and (.status|type=="string")
+      and (.status|IN("todo","in_progress","blocked","done"))
+    ' >/dev/null 2>&1; then
       kind_bad=1
       continue
     fi

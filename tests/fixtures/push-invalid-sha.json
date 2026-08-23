@@ -1,8 +1,7 @@
 {
-  "ref": "refs/heads/master",
-  "after": "not-a-sha",
-  "deleted": false,
+  "ref": "refs/heads/main",
+  "after": "HEAD",
   "repository": {
-    "full_name": "acme/widget"
+    "full_name": "acme/app"
   }
 }

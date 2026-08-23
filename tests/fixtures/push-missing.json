@@ -1,3 +1,5 @@
 {
-  "ref": "refs/heads/master"
+  "repository": {
+    "name": "app"
+  }
 }

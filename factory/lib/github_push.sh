@@ -1,6 +1,7 @@
 # Parse an untrusted GitHub push JSON body. Quiet (return 1) on ping,
 # deleted ref, missing identity, wrong types, or failed grammar.
 # Prints identity JSON to stdout on a valid non-deleted push: full_name, after, ref.
+# Return 2 when the payload file cannot be read (cannot decide).
 
 github_push_parse() {
   local src="${1:-}" raw ident deleted after
@@ -9,7 +10,7 @@ github_push_parse() {
       printf '%s\n' "cannot read payload file" >&2
       return 2
     fi
-    raw=$(cat "$src") || return 2
+    raw=$(cat -- "$src") || return 2
   else
     raw=$(cat)
   fi
@@ -17,7 +18,7 @@ github_push_parse() {
   ident=$(printf '%s\n' "$raw" | jq -c '
     def ok_name: type == "string" and test("^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$");
     def ok_sha: type == "string" and test("^[0-9a-f]{40}$");
-    def ok_ref: type == "string" and (test("[\\n\\r;|&`$\\\\]") | not) and . != "";
+    def ok_ref: type == "string" and . != "" and (contains("\n") | not) and (contains("\r") | not);
     if type != "object" then empty
     elif ((has("zen") and (.zen | type == "string")) and (has("after") | not)) then empty
     elif (.repository | type) != "object" then empty

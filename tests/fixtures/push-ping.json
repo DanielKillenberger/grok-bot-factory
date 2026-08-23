@@ -1,8 +1,11 @@
 {
-  "zen": "Keep it logically awesome.",
+  "zen": "Speak like a human.",
   "hook_id": 1,
-  "hook": {"type": "Repository"},
+  "hook": {
+    "type": "Repository",
+    "id": 1
+  },
   "repository": {
-    "full_name": "acme/widget"
+    "full_name": "acme/app"
   }
 }

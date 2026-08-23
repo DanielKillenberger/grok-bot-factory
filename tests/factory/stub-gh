@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# Test-only gh stub. Records argv. Never talks to GitHub.
+set -euo pipefail
+
+printf '%s\n' "$*" >> "${FACTORY_GH_LOG:?}"
+
+case "$*" in
+  *'repo list'*|*'repo ls'*|*user/repos*|*search/repositories*|*'/orgs/'*)
+    printf '%s\n' "$*" >> "${FACTORY_GH_LOG}.fleet"
+    printf '%s\n' "gh: fleet-scan is forbidden on the fire path" >&2
+    exit 1
+    ;;
+esac
+
+http_err() {
+  printf 'gh: %s (HTTP %s)\n' "$2" "$1" >&2
+  exit 1
+}
+
+network_err() {
+  printf 'gh: Get "https://api.github.com/": dial tcp: lookup api.github.com: no such host\n' >&2
+  exit 1
+}
+
+contents_file() {
+  local file="$1" name b64
+  name=$(basename -- "$file")
+  b64=$(base64 <"$file" | tr -d '\n')
+  jq -n --arg name "$name" --arg content "$b64" \
+    '{name:$name, path:("x/"+$name), type:"file", encoding:"base64", content:$content}'
+}
+
+dir_listing() {
+  jq -n --args '$ARGS.positional | map({name:., type:"file", path:("x/"+.)})' "$@"
+}
+
+args="$*"
+scenario="${FACTORY_STUB:?}"
+repo="${FACTORY_STUB_REPO:-acme/app}"
+fix="${FACTORY_FIXTURES:?}"
+
+path_has() { [[ "$args" == *"$1"* ]]; }
+
+# 429-then-ok: first matching membership call fails once.
+if [ "$scenario" = "429_then_ok" ] && path_has "repos/${repo}/contents/.flow" && ! path_has "contents/.flow/"; then
+  count_file="${FACTORY_GH_LOG}.429"
+  n=0
+  [ -f "$count_file" ] && n=$(cat "$count_file")
+  n=$((n + 1))
+  printf '%s\n' "$n" >"$count_file"
+  if [ "$n" -eq 1 ]; then
+    http_err 429 "API rate limit exceeded"
+  fi
+  dir_listing
+  exit 0
+fi
+
+case "$scenario" in
+  network)
+    network_err
+    ;;
+  membership_403)
+    http_err 403 "Resource not accessible by integration"
+    ;;
+  membership_500)
+    http_err 502 "Server Error"
+    ;;
+  membership_404)
+    http_err 404 "Not Found"
+    ;;
+esac
+
+if path_has "repos/${repo}/contents/.flow" && ! path_has "contents/.flow/"; then
+  case "$scenario" in
+    empty|pilot|land|mixed|unclassifiable|unready|malformed|partial|feature|missing_specs|bad_listing|bad_task)
+      dir_listing
+      exit 0
+      ;;
+  esac
+fi
+
+if path_has "repos/${repo}/contents/.flow/specs" && ! path_has "contents/.flow/specs/"; then
+  case "$scenario" in
+    empty|unready)
+      if [ "$scenario" = unready ]; then
+        dir_listing spec-unready.json spec-missing-ready.json
+      else
+        printf '%s\n' '[]'
+      fi
+      exit 0
+      ;;
+    pilot|feature)
+      dir_listing spec-ready-pilot.json
+      exit 0
+      ;;
+    land)
+      dir_listing spec-ready-land.json
+      exit 0
+      ;;
+    mixed)
+      dir_listing spec-ready-pilot.json spec-ready-land.json
+      exit 0
+      ;;
+    unclassifiable)
+      dir_listing spec-unclassifiable.json
+      exit 0
+      ;;
+    malformed)
+      dir_listing spec-malformed.json
+      exit 0
+      ;;
+    partial)
+      dir_listing spec-ready-pilot.json spec-ready-land.json
+      exit 0
+      ;;
+    missing_specs)
+      http_err 404 "Not Found"
+      ;;
+    bad_listing)
+      printf '%s\n' '[{"name":"spec-ready-pilot.json"}]'
+      exit 0
+      ;;
+    bad_task)
+      printf '%s\n' '[]'
+      exit 0
+      ;;
+  esac
+fi
+
+if path_has "repos/${repo}/contents/.flow/tasks" && ! path_has "contents/.flow/tasks/"; then
+  case "$scenario" in
+    empty|unready|unclassifiable|malformed|bad_listing)
+      printf '%s\n' '[]'
+      exit 0
+      ;;
+    bad_task)
+      dir_listing task-bad.json
+      exit 0
+      ;;
+    pilot|feature)
+      dir_listing task-open.json
+      exit 0
+      ;;
+    land)
+      dir_listing task-done.json
+      exit 0
+      ;;
+    mixed)
+      dir_listing task-open.json task-done.json
+      exit 0
+      ;;
+    partial)
+      printf '%s\n' '[]'
+      exit 0
+      ;;
+  esac
+fi
+
+if path_has "contents/.flow/specs/spec-ready-pilot.json"; then
+  contents_file "$fix/sidecars/spec-ready-pilot.json"
+  exit 0
+fi
+if path_has "contents/.flow/specs/spec-ready-land.json"; then
+  if [ "$scenario" = partial ]; then
+    http_err 500 "Server Error"
+  fi
+  contents_file "$fix/sidecars/spec-ready-land.json"
+  exit 0
+fi
+if path_has "contents/.flow/specs/spec-unready.json"; then
+  contents_file "$fix/sidecars/spec-unready.json"
+  exit 0
+fi
+if path_has "contents/.flow/specs/spec-missing-ready.json"; then
+  contents_file "$fix/sidecars/spec-missing-ready.json"
+  exit 0
+fi
+if path_has "contents/.flow/specs/spec-unclassifiable.json"; then
+  contents_file "$fix/sidecars/spec-unclassifiable.json"
+  exit 0
+fi
+if path_has "contents/.flow/specs/spec-malformed.json"; then
+  name="spec-malformed.json"
+  b64=$(base64 <"$fix/sidecars/spec-malformed.json" | tr -d '\n')
+  jq -n --arg name "$name" --arg content "$b64" \
+    '{name:$name, type:"file", encoding:"base64", content:$content}'
+  exit 0
+fi
+if path_has "contents/.flow/tasks/task-open.json"; then
+  contents_file "$fix/sidecars/task-open.json"
+  exit 0
+fi
+if path_has "contents/.flow/tasks/task-done.json"; then
+  contents_file "$fix/sidecars/task-done.json"
+  exit 0
+fi
+if path_has "contents/.flow/tasks/task-bad.json"; then
+  contents_file "$fix/sidecars/task-bad.json"
+  exit 0
+fi
+
+if path_has "repos/${repo}/pulls"; then
+  case "$scenario" in
+    land|mixed)
+      printf '%s\n' '[{"number":1}]'
+      exit 0
+      ;;
+    *)
+      printf '%s\n' '[]'
+      exit 0
+      ;;
+  esac
+fi
+
+http_err 404 "Not Found"
