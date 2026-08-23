@@ -7,7 +7,7 @@
 
 This repo is an easy-to-install Grok Bot software factory. The root README is an intent sketch. This spec is the durable product contract. [user]
 
-It is not an app, not a dashboard, and not a server you run. [paraphrase]
+The factory is installable software plus the existing Grok Bot supervisor. A dashboard is welcome and in scope. It is not required for the first wake/install slice. Do not invent its screens in this spec. [user]
 
 Grok Bot coordinates. Building happens on a host CLI that flow-next already documents. The installer and the product-repo `.flow/config.json` choose the host CLI and `review.backend`. Claude Code is a first-class path. Pinning grok + cursor-agent is one valid installer default (Daniel’s own box), not the product lock. The host is `/loop` or `/goal`. That host calls `/flow-next:pilot` once per tick. Grok Bot is not the loop. The supervisor is not the tick. Do not implement in Grok Bot chat. [user]
 
@@ -26,7 +26,7 @@ No secrets in this public repo. No new bot. [user]
 
 <!-- Source-tag breakdown: 85% [user] / 10% [paraphrase] / 5% [inferred] -->
 
-The happy-path wake is an existing GitHub **repo webhook** POSTing to an existing Grok Bot **webhook routine**. It is not a server this factory builds. It is not phone-home. It is not Homeplane. [user]
+The happy-path wake is an existing GitHub **repo webhook** POSTing to an existing Grok Bot **webhook routine**. Do not build a factory HTTP listener as the happy-path wake. [user]
 
 ### Routine (Grok Bot)
 
@@ -108,10 +108,8 @@ Pinning grok + cursor-agent (review pin `cursor:gpt-5.6-sol-high`) is one valid 
 
 Optional hygiene for Daniel’s installer default (not a product defect for other installers): do not run local CLI and Cloud Agents for the same role on the same tick. [user]
 
-### What this is not
+### Wake fallbacks
 
-- Phone-home (Grok Build → Grok Bot chat pipe) is a different do-not-build. This webhook is not that. [user]
-- Homeplane is not the wake. [user]
 - A coarse cron is an optional fallback. Do not document a poll as the factory. [user]
 
 ## API Contracts
@@ -222,7 +220,6 @@ Installer default on Daniel’s box may pin grok + `cursor:gpt-5.6-sol-high`. Ot
 - No secrets, webhook URL, sender key, or vault paths in the public repo. [user]
 - No new bot. [user]
 - No implementation work in Grok Bot chat. [user]
-- Phone-home must not be built. Homeplane is not the wake. [user]
 - Do not document a poll/cron as the factory. [user]
 - Owner-gated acts named in the README sketch: send, pay, publish, merge. Those still require a human. [paraphrase]
 - Branch filter for which git refs count as a factory tick: **unknown**. Do not invent one.
@@ -233,7 +230,7 @@ Installer default on Daniel’s box may pin grok + `cursor:gpt-5.6-sol-high`. Ot
 ## Acceptance Criteria
 <!-- scope: both -->
 
-- **R1:** The happy-path install is: create one Grok Bot routine with trigger `{ "type": "webhook" }`; copy URL and sender key from the **routine panel**; in each product repo use GitHub **Settings → Webhooks → Add webhook** with Payload URL = that routine URL, Secret = that sender key, Events = **push** only. [user] Errors: any other install path (Cursor GitHub listeners, phone-home, Homeplane, a factory-built HTTP server, a poll presented as the factory) is out of contract and must not be documented or implemented as the happy path.
+- **R1:** The happy-path install is: create one Grok Bot routine with trigger `{ "type": "webhook" }`; copy URL and sender key from the **routine panel**; in each product repo use GitHub **Settings → Webhooks → Add webhook** with Payload URL = that routine URL, Secret = that sender key, Events = **push** only. [user] Errors: any other install path (Cursor GitHub listeners, a factory-built HTTP listener as the wake, a poll presented as the factory) is out of contract and must not be documented or implemented as the happy path.
 
 - **R2:** Agents never see or need the sender key. The routine URL and sender key are not written to git or to this public repo. [user] Errors: if a change would embed URL, key, token, PAT, session, or vault path in the repo, reject the change; do not substitute a redacted placeholder that still encodes the secret.
 
@@ -265,8 +262,6 @@ Installer default on Daniel’s box may pin grok + `cursor:gpt-5.6-sol-high`. Ot
 
 - **R16:** Cursor GitHub listeners (`pr-opened`, `pr-pushed`, `pr-merged`, reviews, CI) are a different trigger family with no raw git-push and no repo wildcard. They are not the happy path. [user] Errors: documenting or implementing those listeners as the factory wake fails this criterion.
 
-- **R17:** Phone-home (Grok Build → Grok Bot chat pipe) is a different do-not-build. This webhook is not that. Homeplane is not the wake. [user] Errors: building phone-home or using Homeplane as the wake fails this criterion.
-
 - **R18:** No new bot. No secrets in the public repo. No force-push. git `-c` author (`daniel.killenberger@gmail.com`) is allowed; git config and remotes are not changed. [user] Errors: force-push, config/remote edits, or a new bot identity fail this criterion.
 
 - **R19:** A coarse cron may exist later as an optional fallback. It must not be documented or built as the factory. [user] Errors: a poll presented as the install path or the wake fails this criterion.
@@ -278,6 +273,8 @@ Installer default on Daniel’s box may pin grok + `cursor:gpt-5.6-sol-high`. Ot
 - **R22:** A factory run that requires a host CLI or review backend flow-next does not document is a defect. [user] Errors: introducing an undocumented platform, backend name, or HMAC/verifier story as if it were in the flow-next 4.5.1 contract fails this criterion.
 
 - **R23:** Invoke the host CLI the way flow-next documents for that platform. Do not invent a second driver. [user] Errors: a factory-invented wrapper, a bare undocumented binary name, or a second driver that is not the documented invocation for the chosen platform fails this criterion.
+
+- **R24:** A dashboard is in scope and welcome. First slice may ship without one. Forbidding a dashboard, or treating "not a dashboard" as product identity, is a defect. Inventing dashboard screens, auth, or telemetry in this spec is a defect. [user] Errors: forbidding a dashboard, treating "not a dashboard" as product identity, or inventing dashboard screens/auth/telemetry in this spec fails this criterion.
 
 ## Boundaries
 <!-- scope: business -->
@@ -291,9 +288,7 @@ Installer default on Daniel’s box may pin grok + `cursor:gpt-5.6-sol-high`. Ot
 - Do not invent a platform or review backend that flow-next 4.5.1 does not document. [user]
 - Do not treat grok / cursor-agent / grok-4.6 / gpt-5.6-sol-high as the product lock. [user]
 - Do not refuse Claude Code or any other documented host. [user]
-- Do not build a server, dashboard, or app. [paraphrase]
-- Do not build phone-home. [user]
-- Do not use Homeplane as the wake. [user]
+- Do not build a factory HTTP listener as the happy-path wake. The wake is a GitHub repo hook POSTing to a Grok Bot webhook routine. [user]
 - Do not use Cursor GitHub listeners as the happy path. [user]
 - Do not document a poll as the factory. [user]
 - Do not create a new bot. [user]
@@ -302,7 +297,7 @@ Installer default on Daniel’s box may pin grok + `cursor:gpt-5.6-sol-high`. Ot
 - Do not change git config or remotes. [user]
 - Do not freeze a named-repo allowlist. [user]
 - Do not add premature implementation tasks that invent script paths. [user]
-- Reader auth, billing, analytics, and any product UI: out of scope (this is a factory runbook + wake + supervisor contract, not an application). [inferred]
+- Do not invent dashboard screens, auth, billing, analytics, widgets, or a stack in this spec. Those stay parked. [user]
 
 ## Decision Context
 <!-- scope: both -->
@@ -324,8 +319,8 @@ Ready is the consent boundary. Arming the wake is a second consent after ready. 
 - **Host and review are flow-next’s documented set.** Claude Code, Codex, Droid, OpenCode, Grok Build, and Cursor are valid hosts. `rp` / `codex` / `copilot` / `cursor` / `host` / `none` are valid review backends. Routing stays on `.flow/config.json` and `flowctl spec|task set-backend`. [user]
 - **Daniel’s box pin is an installer default.** grok + cursor-agent / `cursor:gpt-5.6-sol-high` may be what his installer writes. Other installers that choose another documented host or backend are in contract. [user]
 - **Optional hygiene (Daniel’s installer default, not a product defect):** do not run local CLI and Cloud Agents for the same role on the same tick. Other installers are not defective for omitting that lock. [user]
-- **Rejected: factory HTTP server.** The POST target already exists (Grok Bot routine). Building another listener would be a new server. [paraphrase]
-- **Rejected: phone-home / Homeplane as wake.** Different products; do not build. [user]
+- **Rejected: factory HTTP server as the wake POST target.** The POST target already exists (Grok Bot routine). Building another listener as the happy-path wake is out of contract. That is different from a dashboard. [paraphrase]
+- **Dashboard is allowed and desirable.** First slice is still wake + gate + supervisor. Dashboard shape is parked unknown. Do not invent screens, auth, billing, analytics, widgets, or a stack here. [user]
 - **Rejected: HMAC/signature design in this spec.** Sender-key verification method is unverified. Agents never see the key. Do not invent HMAC. [user]
 - **Rejected: inventing `<webhook_event>` fields.** Unknown schema stays unknown. [user]
 - **Rejected: pinning the product to grok / cursor-agent / grok-4.6 / gpt-5.6-sol-high.** That pin is one installer default. [user]
@@ -341,13 +336,14 @@ Ready is the consent boundary. Arming the wake is a second consent after ready. 
 - Exact `gh` (or other) commands the gate uses. README sketch says `gh`, no clone; command lines are unverified.
 - Gate CLI contract (exit codes, stdout).
 - Whether any git ref / branch filter applies.
-- What Homeplane is, beyond “not the wake”.
-- Phone-home internals, beyond “Grok Build → Grok Bot chat pipe” and “do not build”.
+- Dashboard stack (framework, host, where it runs). Unknown until a later slice.
+- Dashboard auth. Unknown until a later slice.
+- What a dashboard shows (queue, status, or anything else). Unknown until a later slice.
 - Any Grok Bot settings path other than: agent name in chat header (or Cmd+Shift+I) → Routines list.
 
 ## Conversation Evidence
 
-Capture source: locked product + verified wake from Grok Bot, plus the repo README intent sketch, plus Daniel’s 23 Aug 2026 CLI/provider-agnostic rewrite. Host and review lists taken from flow-next 4.5.1 `platforms.md` / README / orchestration docs. No extra UI, delivery names, platforms, backends, or HMAC story were added.
+Capture source: locked product + verified wake from Grok Bot, plus the repo README intent sketch, plus Daniel’s 23 Aug 2026 CLI/provider-agnostic rewrite, plus Daniel’s 23 Aug 2026 dashboard-welcome lock and the lock to say what this product is (no other-product contrast). Host and review lists taken from flow-next 4.5.1 `platforms.md` / README / orchestration docs. No extra UI, delivery names, platforms, backends, HMAC story, or dashboard screens were added.
 
 > user: The spec should be CLI/provider agnostic. If someone wants to use Claude Code they should be able to. Whatever flow-next already supports. (23 Aug 2026)
 
@@ -371,10 +367,6 @@ Capture source: locked product + verified wake from Grok Bot, plus the repo READ
 
 > user: GitHub listener cannot wildcard repos (one concrete owner/name). Another reason repo-hook + webhook routine is the install path.
 
-> user: Phone-home (Grok Build → Grok Bot chat pipe) is a different do-not-build. This webhook is not that.
-
-> user: Homeplane is not the wake.
-
 > user: Gate: deterministic script before any bot/model. Push with nothing ready stays quiet and burns no tokens. Configurable repo set; default = all DanielKillenberger repos that have .flow inited. No frozen allowlist.
 
 > user: Build path: Grok Bot supervises only. Host is /loop or /goal (pilot is one tick). Host CLI and review backend are whatever flow-next already documents. Invoke the CLI the way flow-next documents for that platform; do not invent a second driver. Never-both-local-and-cloud is Daniel’s personal operating lock / installer default, not a product defect.
@@ -384,6 +376,10 @@ Capture source: locked product + verified wake from Grok Bot, plus the repo READ
 > user: No secrets in public repo. No new bot. No implement in Grok Bot chat.
 
 > user: Git: no force-push. git -c author ok (daniel.killenberger@gmail.com). No config/remote changes.
+
+> user: i wouldn't say it isn't a dashboard. We could add a dashboard and that'd be pretty cool. (23 Aug 2026)
+
+> user: Say what this product is. Do not name other repos/products to define it by negation. Wake = GitHub hook → Grok Bot webhook routine is enough. (23 Aug 2026)
 
 > user: LOCKED PRODUCT: Easy-to-install Grok Bot software factory. README is intent sketch; fn-1 is the real spec. Product is not pinned to grok / cursor-agent / grok-4.6 / gpt-5.6-sol-high.
 

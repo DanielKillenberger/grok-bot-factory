@@ -1,6 +1,6 @@
 # grok-bot-factory
 
-Public runbook. Copy these steps. This is not an app, not a dashboard, and not a server you run.
+Public runbook. Copy these steps. The factory is a runbook plus the Grok Bot supervisor. A dashboard is welcome later.
 
 Grok Bot coordinates. Building happens in `grok` + `cursor-agent`. The host is `/loop` or `/goal`. That host calls `/flow-next:pilot` once per tick. Grok Bot is not the loop. The supervisor is not the tick. Do not implement in Grok Bot chat.
 
@@ -17,7 +17,7 @@ The factory is any repo you push to. Not a named-repo allowlist.
    - Payload URL = the routine URL
    - Secret = the sender key from the panel
    - Events: **push** only
-3. That is a GitHub repo hook POSTing to a Grok Bot routine. It is not a server you build. It is not phone-home.
+3. That is a GitHub repo hook POSTing to a Grok Bot routine. Do not build a factory HTTP listener as the wake.
 
 On fire: the routine looks for **ready** specs/tasks only (via `gh`, no clone). If none, stay quiet. If one is sitting, the supervisor starts `/loop` or `/goal` on a checkout. Stay quiet unless a human decision is needed.
 
@@ -42,8 +42,6 @@ Ping the owner only when something needs a decision: `NEEDS_HUMAN`, `ASKED`, or 
 ## Footnotes (not the path)
 
 Cursor GitHub *listeners* have no raw git-push event (PR opened/pushed/merged only). A coarse cron is an optional fallback. Do not document a poll as the factory.
-
-Phone-home (a Grok Build → Grok Bot chat pipe) is a different thing. Do not build it. Do not build Homeplane.
 
 ## Do not put in git
 
