@@ -10,12 +10,16 @@ DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$DIR/lib/pin.sh"
 
 quiet() { exit 0; }
+_in_stuck=0
 stuck() {
   if [ "$#" -gt 0 ]; then
     printf '%s\n' "$*" >&2
   fi
-  if [ -n "${TICK_ID:-}" ]; then
-    tick_log stuck reason "$*"
+  if [ "$_in_stuck" -eq 0 ]; then
+    _in_stuck=1
+    if [ -n "${TICK_ID:-}" ]; then
+      tick_log stuck reason "$*" || true
+    fi
   fi
   exit 20
 }
@@ -23,6 +27,7 @@ stuck() {
 TICK_ID=""
 TICK_HOME=""
 TICK_TREE=""
+TICK_TREE_REAL=""
 TICK_MIRROR=""
 TICK_FULL_NAME=""
 TICK_SHA=""
@@ -51,7 +56,14 @@ tick_log() {
     shift 2
     jqargs+=(--arg "$k" "$v")
   done
-  jq -nc "${jqargs[@]}" '$ARGS.named' >>"$TICK_LOG"
+  if ! jq -nc "${jqargs[@]}" '$ARGS.named' >>"$TICK_LOG"; then
+    printf '%s\n' "cannot write tick log" >&2
+    return 2
+  fi
+}
+
+_routing_block() {
+  sed -n '/flow-next:model-routing:start/,/flow-next:model-routing:end/p' "$1" 2>/dev/null || true
 }
 
 tick_cleanup() {
@@ -59,10 +71,14 @@ tick_cleanup() {
   _cleaned=1
   local rc=0
   if [ -n "$TICK_TREE" ] && [ -e "$TICK_TREE" ]; then
-    tick_log cleanup tree "$TICK_TREE"
-    worktree_remove_at "$TICK_TREE" "$TICK_MIRROR" "$TICK_FULL_NAME" "$TICK_TREE" || rc=$?
-    if [ "$rc" -ne 0 ]; then
-      tick_log cleanup stuck_reason "dirty or locked tree; not force-removed"
+    tick_log cleanup tree "$TICK_TREE" || true
+    if [ -L "$TICK_TREE" ]; then
+      tick_log cleanup stuck_reason "dest is a symlink; not following" || true
+    else
+      worktree_remove_at "$TICK_TREE" "$TICK_MIRROR" "$TICK_FULL_NAME" "${TICK_TREE_REAL:-$TICK_TREE}" || rc=$?
+      if [ "$rc" -ne 0 ]; then
+        tick_log cleanup stuck_reason "dirty or locked tree; not force-removed" || true
+      fi
     fi
   fi
   if [ -n "$TICK_HOME" ] && [ -d "$TICK_HOME" ]; then
@@ -173,7 +189,7 @@ worktree_init_root || stuck "cannot init worktree root"
 TICK_HOME=$(worktree_alloc_home) || stuck "cannot allocate tick dir"
 TICK_ID=$(basename -- "$TICK_HOME")
 TICK_LOG="$FACTORY_WORKTREE_ROOT_REAL/logs/${TICK_ID}.jsonl"
-tick_log alloc home "$TICK_HOME"
+tick_log alloc home "$TICK_HOME" || stuck "cannot write tick log"
 
 host_bin=""
 host_rc=0
@@ -183,7 +199,7 @@ if [ "$host_rc" -ne 0 ]; then
 fi
 # host_resolve ran in a subshell; re-probe so FACTORY_HOST_DRIVE is set here.
 host_probe "$host_bin" || stuck "host cannot run /loop or /goal"
-tick_log host-probe bin "$host_bin" drive "${FACTORY_HOST_DRIVE:-}"
+tick_log host-probe bin "$host_bin" drive "${FACTORY_HOST_DRIVE:-}" || stuck "cannot write tick log"
 
 url="${FACTORY_CLONE_URL:-https://github.com/${repo}.git}"
 TICK_TREE="$TICK_HOME/tree"
@@ -193,7 +209,8 @@ TICK_MIRROR=$(worktree_add_at "$TICK_TREE" "$url" "$sha" "$branch" "$repo") || a
 if [ "$add_rc" -ne 0 ]; then
   stuck "cannot create worktree"
 fi
-tick_log worktree path "$TICK_TREE" mirror "$TICK_MIRROR"
+TICK_TREE_REAL=$(realpath -- "$TICK_TREE")
+tick_log worktree path "$TICK_TREE" mirror "$TICK_MIRROR" || stuck "cannot write tick log"
 
 pin=""
 pin_rc=0
@@ -202,19 +219,18 @@ if [ "$pin_rc" -ne 0 ]; then
   stuck "unfulfillable review pin"
 fi
 review_pin_validate "$pin" "$host_bin" || stuck "unfulfillable review pin"
-tick_log pin backend "$pin"
+tick_log pin backend "$pin" || stuck "cannot write tick log"
 
 cfg="$TICK_TREE/.flow/config.json"
-cfg_before=""
+pin_before="$pin"
+cfg_existed=0
+[ -f "$cfg" ] && cfg_existed=1
 routing_before=""
 routing_file=""
-if [ -f "$cfg" ]; then
-  cfg_before=$(cksum -- "$cfg" | awk '{print $1" "$2}')
-fi
 for f in "$TICK_TREE/CLAUDE.md" "$TICK_TREE/AGENTS.md"; do
   if [ -f "$f" ] && grep -q 'flow-next:model-routing' "$f"; then
     routing_file="$f"
-    routing_before=$(cksum -- "$f" | awk '{print $1" "$2}')
+    routing_before=$(_routing_block "$f")
     break
   fi
 done
@@ -226,37 +242,38 @@ set +e
 host_run "$host_bin" "${FACTORY_HOST_DRIVE:-loop}" "$kind" "$TICK_TREE" >"$host_out" 2>"$host_err"
 run_rc=$?
 set -e
-host_text=$(cat "$host_out" "$host_err" 2>/dev/null || true)
 verdict=""
-if printf '%s\n' "$host_text" | grep -Eq 'NEEDS_HUMAN'; then
-  verdict=NEEDS_HUMAN
-elif printf '%s\n' "$host_text" | grep -Eq 'ASKED'; then
-  verdict=ASKED
-elif printf '%s\n' "$host_text" | grep -Eq 'BLOCKED'; then
-  verdict=BLOCKED
-elif printf '%s\n' "$host_text" | grep -Eq 'DEFERRED_TO_LAND'; then
-  verdict=DEFERRED_TO_LAND
-elif printf '%s\n' "$host_text" | grep -Eq 'NO_WORK'; then
-  verdict=NO_WORK
+if [ "$run_rc" -ne 0 ]; then
+  tick_log invoke rc "$run_rc" verdict "" drive "${FACTORY_HOST_DRIVE:-}" || true
+  stuck "host exited ${run_rc}"
 fi
-tick_log invoke rc "$run_rc" verdict "${verdict:-}" drive "${FACTORY_HOST_DRIVE:-}"
+verdict_line=$(grep -E '^(PILOT_VERDICT|LAND_VERDICT)=' "$host_out" 2>/dev/null | tail -n 1 || true)
+verdict="${verdict_line#*=}"
+tick_log invoke rc "$run_rc" verdict "${verdict:-}" drive "${FACTORY_HOST_DRIVE:-}" || stuck "cannot write tick log"
 
-if [ -n "$cfg_before" ] && [ -f "$cfg" ]; then
-  cfg_after=$(cksum -- "$cfg" | awk '{print $1" "$2}')
-  if [ "$cfg_before" != "$cfg_after" ]; then
+if [ "$cfg_existed" -eq 1 ]; then
+  if [ ! -f "$cfg" ]; then
+    stuck "review pin overwritten"
+  fi
+  pin_after=""
+  pin_after=$(review_pin_read "$TICK_TREE") || stuck "unfulfillable review pin"
+  if [ "$pin_after" != "$pin_before" ]; then
     stuck "review pin overwritten"
   fi
 fi
 if [ -n "$routing_file" ]; then
-  routing_after=$(cksum -- "$routing_file" | awk '{print $1" "$2}')
-  if [ "$routing_before" != "$routing_after" ]; then
+  if [ ! -f "$routing_file" ]; then
+    stuck "routing block overwritten"
+  fi
+  routing_after=$(_routing_block "$routing_file")
+  if [ "$routing_after" != "$routing_before" ]; then
     stuck "routing block overwritten"
   fi
 fi
 
 case "$verdict" in
   NO_WORK)
-    tick_log verdict host_verdict "$verdict"
+    tick_log verdict host_verdict "$verdict" || stuck "cannot write tick log"
     quiet
     ;;
   DEFERRED_TO_LAND|NEEDS_HUMAN|ASKED|BLOCKED)

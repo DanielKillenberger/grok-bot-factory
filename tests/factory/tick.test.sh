@@ -385,6 +385,58 @@ else
   fail "default PATH host not invoked"
 fi
 
+# --- repo keys do not collide (R12) ---
+# shellcheck source=../../factory/lib/worktree.sh
+. "$ROOT/factory/lib/worktree.sh"
+k1=$(_worktree_repo_key 'a/b__c')
+k2=$(_worktree_repo_key 'a__b/c')
+if [ -n "$k1" ] && [ "$k1" != "$k2" ]; then
+  pass "repo keys are injective"
+else
+  fail "repo key collision ($k1 vs $k2)"
+fi
+
+# --- logs symlink-escape ---
+fresh_host_log
+ESCLOG="$TMP/escape-logs"
+EVIL2="$TMP/evil-logs"
+rm -rf -- "$ESCLOG" "$EVIL2"
+mkdir -p -- "$ESCLOG" "$EVIL2"
+ln -s "$EVIL2" "$ESCLOG/logs"
+run_tick --host "$BIN/grok" --worktree-root "$ESCLOG" --clone-url "$PRODUCT" \
+  acme/app "$PRODUCT_SHA" pilot
+assert_stuck "symlink-escape logs refused"
+
+# --- host nonzero is stuck even if NO_WORK is mentioned ---
+fresh_host_log
+make_product "$PRODUCT" none
+FACTORY_HOST_EXIT=1
+export FACTORY_HOST_EXIT
+run_tick --host "$BIN/grok" --worktree-root "$WT" --clone-url "$PRODUCT" \
+  acme/app "$PRODUCT_SHA" pilot
+assert_stuck "host nonzero is stuck"
+unset FACTORY_HOST_EXIT
+
+# --- deleting review pin is overwrite ---
+fresh_host_log
+make_product "$PRODUCT" none
+FACTORY_HOST_MUTATE=delete-pin
+export FACTORY_HOST_MUTATE
+run_tick --host "$BIN/grok" --worktree-root "$WT" --clone-url "$PRODUCT" \
+  acme/app "$PRODUCT_SHA" pilot
+assert_stuck "deleted review pin is stuck"
+unset FACTORY_HOST_MUTATE
+
+# --- unrelated config edit is not treated as pin overwrite ---
+fresh_host_log
+make_product "$PRODUCT" none
+FACTORY_HOST_MUTATE=unrelated
+export FACTORY_HOST_MUTATE
+run_tick --host "$BIN/grok" --worktree-root "$WT" --clone-url "$PRODUCT" \
+  acme/app "$PRODUCT_SHA" pilot
+assert_quiet "unrelated config edit keeps pin"
+unset FACTORY_HOST_MUTATE
+
 # --- NEEDS_HUMAN from host → stuck 20 ---
 fresh_host_log
 make_product "$PRODUCT" none

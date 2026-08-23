@@ -16,11 +16,15 @@ worktree_init_root() {
     printf '%s\n' "cannot resolve worktree root" >&2
     return 2
   }
-  mkdir -p -- \
-    "$FACTORY_WORKTREE_ROOT_REAL/ticks" \
-    "$FACTORY_WORKTREE_ROOT_REAL/logs" \
-    "$FACTORY_WORKTREE_ROOT_REAL/locks" \
-    "$FACTORY_WORKTREE_ROOT_REAL/mirrors" || return 2
+  local d
+  for d in ticks logs locks mirrors; do
+    mkdir -p -- "$FACTORY_WORKTREE_ROOT_REAL/$d" || return 2
+    _worktree_refuse_escape "$FACTORY_WORKTREE_ROOT_REAL/$d" "$d" || return 2
+    if [ -L "$FACTORY_WORKTREE_ROOT_REAL/$d" ]; then
+      printf '%s\n' "symlink-escape: ${d}" >&2
+      return 2
+    fi
+  done
 }
 
 worktree_contained() {
@@ -71,16 +75,55 @@ worktree_alloc_home() {
 }
 
 _worktree_repo_key() {
-  printf '%s\n' "${1//\//__}"
+  printf '%s' "$1" | sha256sum | awk '{print $1}'
+}
+
+_worktree_canon_url() {
+  local u="$1"
+  if [ -e "$u" ]; then
+    realpath -- "$u"
+  else
+    printf '%s\n' "$u"
+  fi
+}
+
+_worktree_mirror_origin() {
+  git --git-dir="$1" remote get-url origin 2>/dev/null || true
 }
 
 _worktree_ensure_mirror() {
   local url="$1" sha="$2" mirror="$3"
-  if [ ! -e "$mirror" ]; then
-    git clone --bare --quiet -- "$url" "$mirror" >/dev/null 2>&1 || return 2
-  elif [ ! -d "$mirror" ]; then
-    printf '%s\n' "mirror is not a directory" >&2
-    return 2
+  local tmp want got
+  want=$(_worktree_canon_url "$url")
+  if [ -e "$mirror" ]; then
+    if [ ! -d "$mirror" ] || [ -L "$mirror" ]; then
+      printf '%s\n' "mirror is not a directory" >&2
+      return 2
+    fi
+    got=$(_worktree_canon_url "$(_worktree_mirror_origin "$mirror")")
+    if [ "$got" != "$want" ]; then
+      printf '%s\n' "mirror url mismatch" >&2
+      return 2
+    fi
+  else
+    tmp="${mirror}.partial.$$"
+    rm -rf -- "$tmp"
+    git clone --bare --quiet -- "$url" "$tmp" >/dev/null 2>&1 || {
+      rm -rf -- "$tmp"
+      return 2
+    }
+    if ! mv -T -- "$tmp" "$mirror" 2>/dev/null; then
+      rm -rf -- "$tmp"
+      if [ ! -d "$mirror" ]; then
+        printf '%s\n' "cannot publish clone" >&2
+        return 2
+      fi
+      got=$(_worktree_canon_url "$(_worktree_mirror_origin "$mirror")")
+      if [ "$got" != "$want" ]; then
+        printf '%s\n' "mirror url mismatch" >&2
+        return 2
+      fi
+    fi
   fi
   git --git-dir="$mirror" fetch --quiet -- "$url" "$sha" 2>/dev/null || \
     git --git-dir="$mirror" fetch --quiet -- "$url" 2>/dev/null || true
@@ -111,14 +154,13 @@ worktree_add_at() {
     return 2
   fi
 
+  _worktree_ensure_mirror "$url" "$sha" "$mirror" || return 2
+
   mkdir -p -- "$FACTORY_WORKTREE_ROOT_REAL/locks"
   rc=0
   {
     flock 9
-    _worktree_ensure_mirror "$url" "$sha" "$mirror" || rc=$?
-    if [ "$rc" -eq 0 ]; then
-      git --git-dir="$mirror" worktree add -q -b "$branch" -- "$dest" "$sha" >/dev/null 2>&1 || rc=$?
-    fi
+    git --git-dir="$mirror" worktree add -q -b "$branch" -- "$dest" "$sha" >/dev/null 2>&1 || rc=$?
   } 9>"$lock"
   [ "$rc" -eq 0 ] || return 2
 
@@ -133,9 +175,13 @@ worktree_remove_at() {
   local dest="$1" mirror="$2" full_name="$3" ours="$4"
   local key dest_real ours_real lock rc
   [ -n "$dest" ] || return 0
+  if [ -L "$dest" ]; then
+    printf '%s\n' "cleanup refused: dest is a symlink" >&2
+    return 2
+  fi
   dest_real=$(realpath -- "$dest" 2>/dev/null) || return 0
   if [ -n "$ours" ]; then
-    ours_real=$(realpath -- "$ours" 2>/dev/null) || return 0
+    ours_real=$(realpath -- "$ours" 2>/dev/null) || ours_real="$ours"
     if [ "$dest_real" != "$ours_real" ]; then
       printf '%s\n' "cleanup refused: not this tick's tree" >&2
       return 2

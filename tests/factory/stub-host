@@ -36,10 +36,26 @@ if [ -n "${FACTORY_HOST_HOLD:-}" ]; then
   done
 fi
 
+case "${FACTORY_HOST_MUTATE:-}" in
+  delete-pin)
+    rm -f -- .flow/config.json
+    ;;
+  unrelated)
+    if [ -f .flow/config.json ]; then
+      jq '.land.patienceMinutes=99' .flow/config.json >.flow/config.json.tmp
+      mv .flow/config.json.tmp .flow/config.json
+    fi
+    ;;
+esac
+
 verdict="${FACTORY_HOST_VERDICT:-NO_WORK}"
 if [[ " $* " == *" /flow-next:land "* ]]; then
   printf 'LAND_VERDICT=%s\n' "$verdict"
 else
   printf 'PILOT_VERDICT=%s\n' "$verdict"
+fi
+if [ "${FACTORY_HOST_EXIT:-0}" -ne 0 ]; then
+  printf 'also mentions NO_WORK in stderr\n' >&2
+  exit "$FACTORY_HOST_EXIT"
 fi
 exit 0
