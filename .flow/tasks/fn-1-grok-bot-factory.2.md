@@ -32,7 +32,7 @@ Start-path after the gate: one worktree per tick, instance host CLI, product rev
 - flow-next claims live in the git common dir (shared across worktrees); working trees must still be unique.
 - `git worktree add` refuses a branch already checked out elsewhere — unique branch/path per tick.
 - Setup never overwrites an existing `review.backend` or `<!-- flow-next:model-routing -->` block. Factory must not either.
-- Native Grok `host` review fails closed for a Grok writer; Grok Build as host CLI is unfulfillable (no `/loop`/`/goal`) → stuck.
+- Native Grok `host` review fails closed for a Grok writer; Grok Build is a valid host CLI (/loop and /goal). /loop is a recurring interval that wakes the agent, same idea as Claude Code.
 
 ## Acceptance
 - [ ] Two overlapping starts get two worktrees; they do not share a working tree

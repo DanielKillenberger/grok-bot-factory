@@ -56,7 +56,7 @@ Exit contract (signature): quiet `0` only when a quiet case is **positively esta
 
 Split the “setup pin” (R13) from the host binary (R14):
 - **Review pin** = the product checkout’s `.flow/config.json` `review.backend` and instruction-file routing block. Documented backends only. Do not overwrite. Unfulfillable review pin → stuck.
-- **Host CLI** = instance input (flag/env): an executable from the documented host set that actually provides `/loop` or `/goal` (land uses `/flow-next:land`). Default = a CLI already on the builder machine. Do **not** infer the host from `review.backend`. If that CLI is missing or cannot provide `/loop`/`/goal`, stuck — no substitute guess. Cloud Agents only if that instance CLI cannot run. Grok Build has no `/loop`/`/goal`; choosing it as the host CLI is unfulfillable (stuck), not a license to invent a Grok-native loop.
+- **Host CLI** = instance input (flag/env): an executable from the documented host set that actually provides `/loop` or `/goal` (land uses `/flow-next:land`). Default = a CLI already on the builder machine. Do **not** infer the host from `review.backend`. If that CLI is missing or cannot provide `/loop`/`/goal`, stuck — no substitute guess. Cloud Agents only if that instance CLI cannot run. Grok Build is a valid host. It has /loop and /goal. /loop is a recurring interval that wakes the agent, same idea as Claude Code.
 
 Worktree allocation is atomic (unique directory per tick), contained under a factory worktree root (`realpath`; refuse symlinks that escape). If ticks share a clone’s git dir, take a narrow per-repo lock around `worktree add`/`remove` only — not a factory-wide one-tick mutex. Do not force-remove dirty trees.
 
