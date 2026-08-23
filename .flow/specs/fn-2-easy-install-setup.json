@@ -1,13 +1,96 @@
 {
   "branch_name": "fn-2-easy-install-setup",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
   "created_at": "2026-08-23T20:51:08.195421Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
   "depends_on_epics": [
     "fn-1-grok-bot-factory"
   ],
   "id": "fn-2-easy-install-setup",
+  "impl_review_rounds": {},
   "next_task": 1,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_rounds": 0,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-08-23T21:39:37.372995Z",
+  "review_attempts": [
+    {
+      "artifact_sha256": "3ace5107f13dea54787562083515c38c06efeec45f18c1be57217684ddb6d210",
+      "backend": "codex",
+      "base_sha": "23619d0008516629cf82ce79acb395a752ed2ccb",
+      "counter_kind": "plan",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "23619d0008516629cf82ce79acb395a752ed2ccb",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 96027,
+      "output_sha256": "9c8c64b0b6f8c7f21501006b51eecc19548b9634aa30ac1b862550c9c1efbb6a",
+      "reservation_id": "aae9ed1b62a645a095c7a12b69bd3a4d",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-08-23T21:37:21.245453Z",
+      "tool_calls": 9,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "22dd538da64707b06107c84de354a2adeb5f772256af916e8baa9046053775bd",
+      "backend": "codex",
+      "base_sha": "23619d0008516629cf82ce79acb395a752ed2ccb",
+      "counter_kind": "plan",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [],
+        "reviewKind": "plan"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "23619d0008516629cf82ce79acb395a752ed2ccb",
+      "head_sha_observed": true,
+      "kind": "plan",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 83,
+      "output_sha256": "40d2d19134681e086a006dfc0c8bb45ef809e3140d67088c1eab2d9a33648691",
+      "reservation_id": "ecd99334a43846ee938860e3b585b40a",
+      "round_consumed": true,
+      "scope": "plan",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-08-23T21:39:37.371317Z",
+      "verdict": "SHIP"
+    }
+  ],
+  "review_hash_epoch": {
+    "plan": 1,
+    "plan#completion": 0
+  },
+  "review_pending_rounds": {},
+  "review_reservations": {},
+  "review_transport_failures": {
+    "plan": 0
+  },
   "spec_path": ".flow/specs/fn-2-easy-install-setup.md",
   "status": "open",
   "title": "Easy-install setup",
@@ -22,5 +105,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-23T21:17:02.288252Z"
+  "updated_at": "2026-08-23T21:39:37.373313Z"
 }

@@ -21,14 +21,21 @@ No secrets land in git. That is a requirement, not out of scope. [user]
 
 Setup is a **conversation** with main, plus GitHub REST for hooks. There is **no public Grok Bot REST** to create an agent or a webhook routine (docs-scout, 2026). Agent/routine creation is conversational/UI; fail closed if routine URL and sender key cannot be obtained from the panel (or owner paste). Do not invent a Grok Bot API client.
 
-Reuse fn-1’s single-repo `.flow/` probe. Discovery **lists** candidates (`gh repo list` + Contents/`.flow/` or `gh repo read-dir`); the fire path in fn-1 still checks one repo only.
+Reuse fn-1’s single-repo `.flow/` probe. Discovery **lists** candidates (`gh repo list` paginated + Contents/`.flow/` or `gh repo read-dir`); the fire path in fn-1 still checks one repo only.
 
 1. Assign an existing builder. Create one only if none exists (conversational). Re-runs reuse the same builder and routine — do not mint a second routine (duplicate wakes).
-2. List candidates; wait for confirm. Default: instance GitHub account repos with `.flow/`, via `gh`, no clone. Whitelist fallback (instance config; no filename in this repo).
+2. List candidates; wait for confirm. Default: instance GitHub account repos with `.flow/`, via `gh`, no clone. Paginate `gh repo list` (do not stop at the 30-repo default). Fail closed with a visible error on auth, 429, 5xx, network, malformed output, or a mid-scan probe failure — never present a silent partial list as complete. Whitelist fallback (instance config; no filename in this repo).
 3. Named repo with no `.flow/`: ask intent and whether to init flow-next. No auto-init, no silent skip. If they want init, they (or main, with consent) run `/flow-next:setup` on that repo. Setup must **not** overwrite an existing pin (R6; flow-next setup already skips already-set `review.backend` and an existing routing block).
-4. On confirm: create the builder webhook routine `{ "type": "webhook" }` if missing; `POST /repos/{owner}/{repo}/hooks` with `name: web`, `events: ["push"]`, `config.content_type: json`, `insecure_ssl: "0"`, Payload URL = routine URL, Secret = sender key. `GET …/hooks` first; skip if an equivalent hook exists. Never PATCH a hook without re-sending `secret` (GitHub clears it). Treat GitHub `ping` as reachability, not work.
-5. Partial failure: no automatic rollback. Report what succeeded. Re-run is idempotent (GET hooks / reuse routine).
-6. Deliverable is setup software. Do not arm live repos as a side effect of implementing this spec.
+4. Confirm handoff (R3): the mutate program accepts **only** an explicit owner-confirmed `owner/name` list. The skill invokes it only after the confirmation reply. Unconfirmed candidates never reach hook create.
+5. On confirm: create the builder webhook routine `{ "type": "webhook" }` if missing. That routine **reuses fn-1’s contract**: command-first exec of the gate program on the delivered GitHub push body (zero model tokens), then the coordinator/tick runner, with the instance host-CLI input. Fail closed if routine URL and sender key cannot be obtained (owner paste from the panel is allowed). Do not invent a Grok Bot REST client.
+6. GitHub hooks: paginate `GET /repos/{owner}/{repo}/hooks`. GitHub redacts `secret` as `********`, so GET cannot prove the sender key — never “skip equivalent” on URL match alone.
+   - Zero hooks with this routine URL → `POST` `name: web`, `events: ["push"]`, `config.content_type: json`, `insecure_ssl: "0"`, url=routine URL, secret=sender key, `active: true`.
+   - Exactly one hook with this routine URL → `PATCH` the complete desired config **including the current secret**, `active: true`, events exactly `["push"]`.
+   - Two or more hooks with this routine URL → fail/report that repo (ambiguous); do not guess.
+   - Duplicate-create `422` → re-GET and converge.
+   Treat GitHub `ping` as reachability, not work.
+7. Partial failure: no automatic rollback. Report what succeeded. Re-run is idempotent (converge hooks / reuse routine).
+8. Deliverable is setup software. Do not arm live repos as a side effect of implementing this spec.
 
 Rejected as overkill: a new GitHub/git bot; auto-init of `.flow/`; dashboard; inventing instance-config filenames; inventing Grok Bot REST.
 
@@ -61,7 +68,8 @@ Storage filenames for instance inputs: unknown, instance config, not this git re
 - Deliverable is setup software. Running it against live repos is a later owner yes. [user]
 - Creating a Grok Bot builder agent when none exists is allowed. A new GitHub/git bot is not. [paraphrase]
 - No public Grok Bot API for agents/routines: conversation/UI only; fail closed if URL+sender key cannot be obtained.
-- Duplicate hooks multiply every push. GET first.
+- Duplicate hooks multiply every push. Paginate GET; converge a unique URL match with PATCH+secret; report ambiguous duplicates.
+- Incomplete discovery (default 30-repo cap, mid-scan failure) is an error, not a confirmable list.
 - Partial setup: report; no automatic rollback; retry is idempotent.
 
 ## Quick commands
@@ -98,6 +106,8 @@ Once the factory runs, setup should be “give this repo to my main agent.” [u
 - Agent/routine create is conversational because no public Grok Bot CRUD API exists (2026 docs). GitHub hooks use REST, which does exist.
 - Content type is `json` (`application/json`).
 - Partial-setup rollback is not built: idempotent retry + a success/fail report is enough.
+- “Skip equivalent hooks” was rejected: GitHub never returns the real secret on GET (`********`), so URL match is not identity of the sender key. Converge with PATCH including the current secret.
+- The easy-install routine is not a second factory. It must invoke fn-1’s gate command-first.
 
 ## Acceptance Criteria
 <!-- scope: both -->
@@ -118,7 +128,7 @@ Once the factory runs, setup should be “give this repo to my main agent.” [u
 
 ## Early proof point
 
-Task fn-2-easy-install-setup.1 proves discover-then-confirm: candidates listed without clone, confirm required, a named repo without `.flow/` asks (no auto-init, no silent skip). If that fails, do not create hooks.
+Task fn-2-easy-install-setup.1 proves discover-then-confirm: complete candidate list (or a visible fail-closed error), confirm required, a named repo without `.flow/` asks (no auto-init, no silent skip), and the mutate program is not callable with an unconfirmed list. If that fails, do not create hooks.
 
 ## Requirement coverage
 
@@ -126,7 +136,7 @@ Task fn-2-easy-install-setup.1 proves discover-then-confirm: candidates listed w
 |-----|-------------|---------|-------------------|
 | R1  | Finish setup from a conversation with main | fn-2-easy-install-setup.1, fn-2-easy-install-setup.2 | — |
 | R2  | Assign existing builder; create only if none | fn-2-easy-install-setup.2 | — |
-| R3  | Discover-then-confirm; gh no clone; whitelist fallback | fn-2-easy-install-setup.1 | — |
+| R3  | Discover-then-confirm; gh no clone; whitelist fallback | fn-2-easy-install-setup.1, fn-2-easy-install-setup.2 | — |
 | R4  | On confirm: builder webhook routine + GitHub push hooks | fn-2-easy-install-setup.2 | — |
 | R5  | Named repo without `.flow/`: ask intent + init | fn-2-easy-install-setup.1 | — |
 | R6  | Do not overwrite flow-next:setup pin | fn-2-easy-install-setup.2 | — |
