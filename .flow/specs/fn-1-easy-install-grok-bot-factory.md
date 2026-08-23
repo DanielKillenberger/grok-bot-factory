@@ -9,7 +9,7 @@ This repo is an easy-to-install Grok Bot software factory. The root README is an
 
 It is not an app, not a dashboard, and not a server you run. [paraphrase]
 
-Grok Bot coordinates. Building happens in `grok` + `cursor-agent`. The host is `/loop` or `/goal`. That host calls `/flow-next:pilot` once per tick. Grok Bot is not the loop. The supervisor is not the tick. Do not implement in Grok Bot chat. [user]
+Grok Bot coordinates. Building happens on a host CLI that flow-next already documents. The installer and the product-repo `.flow/config.json` choose the host CLI and `review.backend`. Claude Code is a first-class path. Pinning grok + cursor-agent is one valid installer default (Daniel’s own box), not the product lock. The host is `/loop` or `/goal`. That host calls `/flow-next:pilot` once per tick. Grok Bot is not the loop. The supervisor is not the tick. Do not implement in Grok Bot chat. [user]
 
 A spec or task is in the queue only when flow-next marks it **ready**. Drafts are ignored. Ready is the consent boundary. The supervisor does not promote. [user]
 
@@ -78,11 +78,35 @@ Add a repo by adding the same GitHub webhook on the new `owner/name`, same routi
 - Grok Bot supervises only. [user]
 - Host is `/loop` or `/goal` (pilot is one tick). [user]
 - `/flow-next:pilot` is one tick. `/loop` or `/goal` calls it each tick until `NO_WORK`, `NEEDS_HUMAN`, or `DEFERRED_TO_LAND`. [user]
-- Implementer: `grok` (grok-4.6). [user]
-- Reviewer: `cursor-agent` `gpt-5.6-sol-high` (review pin `cursor:gpt-5.6-sol-high`). [user]
-- Never bare `agent`. [user]
-- Never both local and cloud. [user]
-- Cloud Agents only if the CLIs cannot. Then two CloudAgents: implementer grok-4.6, reviewer gpt-5.6-sol. [user]
+- Host CLI = whatever flow-next already documents (flow-next 4.5.1 `platforms.md` / README). Choosing Claude Code is valid. [user]
+- Review backend = whatever flow-next already documents. Choosing `cursor:gpt-5.6-sol-high` is valid. Choosing another documented backend is valid. [user]
+- Impl / review / sync routing uses flow-next’s existing `.flow/config.json` plus `flowctl spec set-backend` / `task set-backend` (`--impl`, `--review`, `--sync`). [user]
+- Invoke the CLI the way flow-next documents for that platform. Do not invent a second driver. [user]
+- A factory run that requires a CLI or backend flow-next does not document is a defect. A factory that refuses Claude Code or any other documented host is a defect. [user]
+
+Documented host platforms (flow-next 4.5.1; do not invent extras): [user]
+
+- Claude Code (canonical)
+- OpenAI Codex (pre-built mirror)
+- Factory Droid
+- community OpenCode
+- Grok Build (Claude Code compatibility)
+- Cursor (via `.cursor-plugin` local install)
+
+Documented review backends (flow-next 4.5.1; do not invent extras): [user]
+
+- `rp` (RepoPrompt, macOS-only)
+- `codex`
+- `copilot`
+- `cursor`
+- `host`
+- `none`
+
+Grammar: `backend[:model[:effort]]` except `cursor` folds effort into the model (`cursor:gpt-5.6-sol-high`). [user]
+
+Pinning grok + cursor-agent (review pin `cursor:gpt-5.6-sol-high`) is one valid installer default for Daniel’s own box. It is not the product lock. [user]
+
+Optional hygiene for Daniel’s installer default (not a product defect for other installers): do not run local CLI and Cloud Agents for the same role on the same tick. [user]
 
 ### What this is not
 
@@ -161,6 +185,23 @@ Stated outcomes:
 - One sitting ready spec/task → supervisor may start `/loop` or `/goal` on a checkout. [user]
 - Gate says a tick could run → model may start. Otherwise no model. [user]
 
+### Host CLI and review-backend contract (flow-next 4.5.1)
+
+The factory uses whatever flow-next already supports. Do not invent a platform or backend. [user]
+
+Host platforms (documented): Claude Code (canonical), OpenAI Codex (pre-built mirror), Factory Droid, community OpenCode, Grok Build (Claude Code compatibility), Cursor (via `.cursor-plugin` local install). [user]
+
+Review backends (documented): `rp` (RepoPrompt, macOS-only), `codex`, `copilot`, `cursor`, `host`, `none`. [user]
+
+Spec form: `backend[:model[:effort]]`. `cursor` folds effort into the model (`cursor:gpt-5.6-sol-high`). [user]
+
+Routing surfaces that already exist (do not invent a new one): [user]
+
+- product-repo `.flow/config.json` `review.backend`
+- `flowctl spec set-backend` / `task set-backend` with `--impl`, `--review`, `--sync`
+
+Installer default on Daniel’s box may pin grok + `cursor:gpt-5.6-sol-high`. Other documented hosts and backends remain valid. [user]
+
 ## Edge Cases & Constraints
 <!-- scope: technical -->
 
@@ -174,9 +215,8 @@ Stated outcomes:
 - Creating or changing a routine may show Daniel a confirm card while he is away. [user]
 - Cursor GitHub listeners cannot be the install path (no raw git-push; no repo wildcard). [user]
 - Adding a repo is adding the same hook on that concrete `owner/name`. [user]
-- Never bare `agent`. [user]
-- Never run local CLI implementer/reviewer and Cloud Agents for the same tick. [user]
-- Cloud Agents only if CLIs cannot. [user]
+- Invoke the host CLI the way flow-next documents for that platform. Do not invent a second driver. [user]
+- Optional hygiene for Daniel’s installer default, not a product defect: do not run local CLI and Cloud Agents for the same role on the same tick. [user]
 - No force-push. [user]
 - `git -c` author is allowed (`daniel.killenberger@gmail.com`). No git config or remote changes. [user]
 - No secrets, webhook URL, sender key, or vault paths in the public repo. [user]
@@ -187,6 +227,8 @@ Stated outcomes:
 - Owner-gated acts named in the README sketch: send, pay, publish, merge. Those still require a human. [paraphrase]
 - Branch filter for which git refs count as a factory tick: **unknown**. Do not invent one.
 - What “`.flow` inited” means as a machine check (dir exists vs `flowctl detect` valid vs ready specs present): **unknown** beyond the words given.
+- HMAC / sender-key verification method: **unknown**. Stay parked. Do not invent HMAC. [user]
+- `<webhook_event>` schema: **unknown**. Stay parked. [user]
 
 ## Acceptance Criteria
 <!-- scope: both -->
@@ -215,9 +257,9 @@ Stated outcomes:
 
 - **R12:** Grok Bot supervises only. The host is `/loop` or `/goal`. `/flow-next:pilot` is one tick. `/loop` or `/goal` calls it each tick until `NO_WORK`, `NEEDS_HUMAN`, or `DEFERRED_TO_LAND`. [user] Errors: implementing product work inside Grok Bot chat, or treating Grok Bot as the tick, is out of contract.
 
-- **R13:** Implementer is grok-4.6. Reviewer is cursor-agent with `gpt-5.6-sol-high` (pin `cursor:gpt-5.6-sol-high`). Never bare `agent`. Never both local and cloud on the same tick. [user] Errors: a bare `agent` invocation, or mixing local CLI and Cloud Agents in one tick, fails this criterion.
+- **R13:** Host CLI is whatever flow-next already documents: Claude Code (canonical), OpenAI Codex (pre-built mirror), Factory Droid, community OpenCode, Grok Build (Claude Code compatibility), Cursor (via `.cursor-plugin` local install). Choosing Claude Code is valid. Pinning grok + cursor-agent is one valid installer default, not the product lock. [user] Errors: a factory that refuses Claude Code, or any other documented host, is a defect; treating Daniel’s grok pin as the only legal host is a defect.
 
-- **R14:** Cloud Agents only if the CLIs cannot. Then exactly two CloudAgents: implementer grok-4.6 and reviewer gpt-5.6-sol. [user] Errors: Cloud Agents as the default path, a single CloudAgent playing both roles, or a third CloudAgent, fail this criterion.
+- **R14:** Review backend is whatever flow-next already documents: `rp` (RepoPrompt, macOS-only), `codex`, `copilot`, `cursor`, `host`, `none`, plus the documented spec form `backend[:model[:effort]]` (`cursor` folds effort into the model, e.g. `cursor:gpt-5.6-sol-high`). Choosing `cursor:gpt-5.6-sol-high` is valid. Choosing another documented backend is valid. [user] Errors: requiring a backend flow-next does not document is a defect; treating `cursor:gpt-5.6-sol-high` as the only legal review pin is a defect.
 
 - **R15:** Notify Clawniel only on `NEEDS_HUMAN`, `ASKED`, or an owner-gated act (send, pay, publish, merge). Else ship quiet. No scanning / picked-up pings. [user] Errors: any informational progress ping to Clawniel fails this criterion.
 
@@ -231,6 +273,12 @@ Stated outcomes:
 
 - **R20:** This spec stays not-ready until Daniel marks it ready. Capture must not call `flowctl spec ready`. [user] Errors: `ready: true` on this spec after capture is a failed criterion.
 
+- **R21:** Impl / review / sync routing uses flow-next’s existing surfaces: product-repo `.flow/config.json` (`review.backend`) and `flowctl spec set-backend` / `task set-backend` (`--impl`, `--review`, `--sync`). [user] Errors: inventing a second routing mechanism, config key, or driver outside those surfaces fails this criterion.
+
+- **R22:** A factory run that requires a host CLI or review backend flow-next does not document is a defect. [user] Errors: introducing an undocumented platform, backend name, or HMAC/verifier story as if it were in the flow-next 4.5.1 contract fails this criterion.
+
+- **R23:** Invoke the host CLI the way flow-next documents for that platform. Do not invent a second driver. [user] Errors: a factory-invented wrapper, a bare undocumented binary name, or a second driver that is not the documented invocation for the chosen platform fails this criterion.
+
 ## Boundaries
 <!-- scope: business -->
 
@@ -240,6 +288,9 @@ Stated outcomes:
 - Do not arm the Grok Bot webhook routine. [user]
 - Do not put routine URL, sender key, tokens, PATs, sessions, or vault paths in git. [user]
 - Do not invent UI, events, HMAC, console paths, or GitHub delivery field names that were not verified. [user]
+- Do not invent a platform or review backend that flow-next 4.5.1 does not document. [user]
+- Do not treat grok / cursor-agent / grok-4.6 / gpt-5.6-sol-high as the product lock. [user]
+- Do not refuse Claude Code or any other documented host. [user]
 - Do not build a server, dashboard, or app. [paraphrase]
 - Do not build phone-home. [user]
 - Do not use Homeplane as the wake. [user]
@@ -250,6 +301,7 @@ Stated outcomes:
 - Do not force-push. [user]
 - Do not change git config or remotes. [user]
 - Do not freeze a named-repo allowlist. [user]
+- Do not add premature implementation tasks that invent script paths. [user]
 - Reader auth, billing, analytics, and any product UI: out of scope (this is a factory runbook + wake + supervisor contract, not an application). [inferred]
 
 ## Decision Context
@@ -258,7 +310,7 @@ Stated outcomes:
 ### Motivation
 <!-- scope: business -->
 
-Daniel wants an easy-to-install software factory that Grok Bot supervises and that `grok` + `cursor-agent` execute. The README already sketches the runbook. This spec is the real contract so a later ready-mark can start work without re-deriving wake facts. [paraphrase]
+Daniel wants an easy-to-install software factory that Grok Bot supervises and that a flow-next-supported host CLI executes. If someone wants Claude Code, they should be able to use it. The product is CLI/provider agnostic within what flow-next already documents. The README already sketches the runbook. This spec is the real contract so a later ready-mark can start work without re-deriving wake facts or re-pinning a vendor. [paraphrase]
 
 Ready is the consent boundary. Arming the wake is a second consent after ready. This capture stops before both. [user]
 
@@ -269,11 +321,15 @@ Ready is the consent boundary. Arming the wake is a second consent after ready. 
 - **Deterministic gate before any model.** A busy GitHub account must not spend tokens on empty pushes. [user]
 - **Configurable repo set, not a frozen allowlist.** Default discovers `DanielKillenberger` repos with `.flow` inited. Adding a repo is adding a hook, not editing a baked list. [user]
 - **Quiet notify.** Only Clawniel, and only for `NEEDS_HUMAN` / `ASKED` / owner-gated merge. Progress chatter is rejected. [user]
-- **CLIs first.** Implementer grok-4.6 and reviewer cursor-agent gpt-5.6-sol-high. Cloud Agents only when CLIs cannot, and then as a pair, never mixed with local. [user]
+- **Host and review are flow-next’s documented set.** Claude Code, Codex, Droid, OpenCode, Grok Build, and Cursor are valid hosts. `rp` / `codex` / `copilot` / `cursor` / `host` / `none` are valid review backends. Routing stays on `.flow/config.json` and `flowctl spec|task set-backend`. [user]
+- **Daniel’s box pin is an installer default.** grok + cursor-agent / `cursor:gpt-5.6-sol-high` may be what his installer writes. Other installers that choose another documented host or backend are in contract. [user]
+- **Optional hygiene (Daniel’s installer default, not a product defect):** do not run local CLI and Cloud Agents for the same role on the same tick. Other installers are not defective for omitting that lock. [user]
 - **Rejected: factory HTTP server.** The POST target already exists (Grok Bot routine). Building another listener would be a new server. [paraphrase]
 - **Rejected: phone-home / Homeplane as wake.** Different products; do not build. [user]
 - **Rejected: HMAC/signature design in this spec.** Sender-key verification method is unverified. Agents never see the key. Do not invent HMAC. [user]
 - **Rejected: inventing `<webhook_event>` fields.** Unknown schema stays unknown. [user]
+- **Rejected: pinning the product to grok / cursor-agent / grok-4.6 / gpt-5.6-sol-high.** That pin is one installer default. [user]
+- **Rejected: inventing a platform, backend, or second driver** that flow-next 4.5.1 does not document. [user]
 
 ## Parked unknowns
 
@@ -291,7 +347,13 @@ Ready is the consent boundary. Arming the wake is a second consent after ready. 
 
 ## Conversation Evidence
 
-Capture source: locked product + verified wake from Grok Bot, plus the repo README intent sketch. No extra UI or delivery names were added.
+Capture source: locked product + verified wake from Grok Bot, plus the repo README intent sketch, plus Daniel’s 23 Aug 2026 CLI/provider-agnostic rewrite. Host and review lists taken from flow-next 4.5.1 `platforms.md` / README / orchestration docs. No extra UI, delivery names, platforms, backends, or HMAC story were added.
+
+> user: The spec should be CLI/provider agnostic. If someone wants to use Claude Code they should be able to. Whatever flow-next already supports. (23 Aug 2026)
+
+> user: Host platforms flow-next already documents: Claude Code (canonical), OpenAI Codex (pre-built mirror), Factory Droid, community OpenCode, Grok Build (Claude Code compatibility), Cursor (via .cursor-plugin local install). Review backends: rp / codex / copilot / cursor / host / none. Grammar backend[:model[:effort]] except cursor folds effort into the model (cursor:gpt-5.6-sol-high). Per-spec/task backends via flowctl spec set-backend / task set-backend (--impl, --review, --sync).
+
+> user: The factory uses whatever flow-next already supports. Installer / repo .flow/config.json chooses the host CLI and review.backend. Claude Code is a first-class path. Pinning grok + cursor-agent is ONE valid installer default (Daniel’s own box), not the product lock.
 
 > user: Routine trigger `{ "type": "webhook" }`. Fires when an outside system POSTs to that routine’s webhook URL.
 
@@ -315,7 +377,7 @@ Capture source: locked product + verified wake from Grok Bot, plus the repo READ
 
 > user: Gate: deterministic script before any bot/model. Push with nothing ready stays quiet and burns no tokens. Configurable repo set; default = all DanielKillenberger repos that have .flow inited. No frozen allowlist.
 
-> user: Build path: Grok Bot supervises only. Host is /loop or /goal (pilot is one tick). Implementer grok-4.6. Reviewer cursor-agent gpt-5.6-sol-high. Never bare agent. Never both local and cloud. Cloud Agents only if CLIs cannot (then two: grok-4.6 + gpt-5.6-sol).
+> user: Build path: Grok Bot supervises only. Host is /loop or /goal (pilot is one tick). Host CLI and review backend are whatever flow-next already documents. Invoke the CLI the way flow-next documents for that platform; do not invent a second driver. Never-both-local-and-cloud is Daniel’s personal operating lock / installer default, not a product defect.
 
 > user: Notify: Clawniel only on NEEDS_HUMAN / ASKED / owner-gated merge. Else ship quiet. No scanning/picked-up pings.
 
@@ -323,6 +385,6 @@ Capture source: locked product + verified wake from Grok Bot, plus the repo READ
 
 > user: Git: no force-push. git -c author ok (daniel.killenberger@gmail.com). No config/remote changes.
 
-> user: LOCKED PRODUCT: Easy-to-install Grok Bot software factory. README is intent sketch; fn-1 is the real spec.
+> user: LOCKED PRODUCT: Easy-to-install Grok Bot software factory. README is intent sketch; fn-1 is the real spec. Product is not pinned to grok / cursor-agent / grok-4.6 / gpt-5.6-sol-high.
 
-> user: Status must NOT be ready. Do not implement. Do not run pilot /loop /goal.
+> user: Status must NOT be ready. Do not implement. Do not run pilot /loop /goal. Do not arm. Do not add premature implementation tasks that invent script paths. Do not create fn-2.
