@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-23T21:14:58.503157Z",
+  "depends_on": [
+    "fn-1-grok-bot-factory.1"
+  ],
+  "id": "fn-1-grok-bot-factory.2",
+  "priority": null,
+  "spec": "fn-1-grok-bot-factory",
+  "spec_path": ".flow/tasks/fn-1-grok-bot-factory.2.md",
+  "status": "todo",
+  "title": "Isolated tick runner and host pin",
+  "updated_at": "2026-08-23T21:30:18.206325Z"
+}

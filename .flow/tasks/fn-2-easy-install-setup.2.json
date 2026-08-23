@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-23T21:14:58.825078Z",
+  "depends_on": [
+    "fn-2-easy-install-setup.1"
+  ],
+  "id": "fn-2-easy-install-setup.2",
+  "priority": null,
+  "spec": "fn-2-easy-install-setup",
+  "spec_path": ".flow/tasks/fn-2-easy-install-setup.2.md",
+  "status": "todo",
+  "title": "Builder, routine, and push hooks",
+  "updated_at": "2026-08-23T21:14:58.825078Z"
+}

@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-23T21:14:58.824726Z",
+  "depends_on": [],
+  "id": "fn-2-easy-install-setup.1",
+  "priority": null,
+  "spec": "fn-2-easy-install-setup",
+  "spec_path": ".flow/tasks/fn-2-easy-install-setup.1.md",
+  "status": "todo",
+  "title": "Discover-then-confirm membership",
+  "updated_at": "2026-08-23T21:14:58.824726Z"
+}
