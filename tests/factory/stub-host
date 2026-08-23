@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Test-only host CLI. Records argv. Never a live model or Cloud Agent.
+set -euo pipefail
+
+if [ -n "${FACTORY_HOST_LOG:-}" ]; then
+  printf '%s\n' "$*" >>"$FACTORY_HOST_LOG"
+fi
+if [ -n "${FACTORY_HOST_PWD_LOG:-}" ]; then
+  printf '%s\n' "$PWD" >>"$FACTORY_HOST_PWD_LOG"
+fi
+
+if [ "${1:-}" = "--help" ]; then
+  case "${FACTORY_HOST_HELP:-loop}" in
+    none)
+      printf '%s\n' "usage: grok"
+      ;;
+    goal)
+      printf '%s\n' "/goal"
+      ;;
+    *)
+      printf '%s\n' "/loop"
+      printf '%s\n' "/goal"
+      ;;
+  esac
+  exit 0
+fi
+
+if [ -n "${FACTORY_HOST_SLEEP:-}" ]; then
+  sleep "$FACTORY_HOST_SLEEP"
+fi
+if [ -n "${FACTORY_HOST_HOLD:-}" ]; then
+  mkdir -p -- "$FACTORY_HOST_HOLD"
+  printf '%s\n' "$PWD" >"$FACTORY_HOST_HOLD/pwd.$$"
+  while [ ! -f "$FACTORY_HOST_HOLD/release" ]; do
+    sleep 0.05
+  done
+fi
+
+verdict="${FACTORY_HOST_VERDICT:-NO_WORK}"
+if [[ " $* " == *" /flow-next:land "* ]]; then
+  printf 'LAND_VERDICT=%s\n' "$verdict"
+else
+  printf 'PILOT_VERDICT=%s\n' "$verdict"
+fi
+exit 0

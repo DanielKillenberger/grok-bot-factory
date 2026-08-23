@@ -29,9 +29,8 @@ Add the same GitHub webhook on the new `owner/name`, same routine URL. Do not fr
 
 1. Check ready specs/tasks only. Skip drafts.
 2. If none: stop. No status ping.
-3. If one is sitting: checkout if needed, start `/loop` or `/goal` (review pin: `cursor:gpt-5.6-sol-high`). Never bare `agent`.
-4. Implementer: `grok` (grok-4.6). Reviewer: Cursor Sol. Never both local and cloud.
-5. Cloud Agents only if the CLIs cannot. Then two CloudAgents: implementer grok-4.6, reviewer gpt-5.6-sol.
+3. If one is sitting: new isolated worktree, start `/loop` or `/goal` via the instance host CLI (flag/env; default = a documented host already on this machine). Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin. Do not infer the host from `review.backend`. Never bare `agent`.
+4. Cloud Agents only if that instance host CLI cannot run.
 
 `/flow-next:pilot` is one tick. `/loop` or `/goal` calls it each tick until `NO_WORK`, `NEEDS_HUMAN`, or `DEFERRED_TO_LAND`.
 
