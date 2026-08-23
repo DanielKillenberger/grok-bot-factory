@@ -247,8 +247,14 @@ if [ "$run_rc" -ne 0 ]; then
   tick_log invoke rc "$run_rc" verdict "" drive "${FACTORY_HOST_DRIVE:-}" || true
   stuck "host exited ${run_rc}"
 fi
-verdict_line=$(grep -E '^(PILOT_VERDICT|LAND_VERDICT)=' "$host_out" 2>/dev/null | tail -n 1 || true)
-verdict="${verdict_line#*=}"
+if [ "$kind" = land ]; then
+  verdict_re='^LAND_VERDICT='
+else
+  verdict_re='^PILOT_VERDICT='
+fi
+verdict_line=$(grep -E "$verdict_re" "$host_out" 2>/dev/null | tail -n 1 || true)
+verdict_raw="${verdict_line#*=}"
+verdict="${verdict_raw%%[[:space:]]*}"
 tick_log invoke rc "$run_rc" verdict "${verdict:-}" drive "${FACTORY_HOST_DRIVE:-}" || stuck "cannot write tick log"
 
 if [ "$cfg_existed" -eq 1 ]; then

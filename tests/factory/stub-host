@@ -50,9 +50,9 @@ esac
 
 verdict="${FACTORY_HOST_VERDICT:-NO_WORK}"
 if [[ " $* " == *" /flow-next:land "* ]]; then
-  printf 'LAND_VERDICT=%s\n' "$verdict"
+  printf 'LAND_VERDICT=%s prs=0 reason="fixture"\n' "$verdict"
 else
-  printf 'PILOT_VERDICT=%s\n' "$verdict"
+  printf 'PILOT_VERDICT=%s spec=fn-x stage=work reason="fixture"\n' "$verdict"
 fi
 if [ "${FACTORY_HOST_EXIT:-0}" -ne 0 ]; then
   printf 'also mentions NO_WORK in stderr\n' >&2

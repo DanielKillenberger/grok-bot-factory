@@ -446,6 +446,13 @@ run_tick --host "$BIN/grok" --worktree-root "$WT" --clone-url "$PRODUCT" \
   acme/app "$PRODUCT_SHA" pilot
 assert_stuck "host NEEDS_HUMAN is stuck"
 
+# --- documented verdict metadata still quiets on NO_WORK (R8) ---
+fresh_host_log
+make_product "$PRODUCT" none
+run_tick --host "$BIN/grok" --worktree-root "$WT" --clone-url "$PRODUCT" \
+  acme/app "$PRODUCT_SHA" pilot
+assert_quiet "PILOT_VERDICT=NO_WORK with metadata fields"
+
 if [ "$failures" -ne 0 ]; then
   printf '%s failures in %s tests\n' "$failures" "$n" >&2
   exit 1
