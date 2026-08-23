@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-23T19:42:26.873618Z",
+  "depends_on": [
+    "fn-1-easy-install-grok-bot-factory.3"
+  ],
+  "id": "fn-1-easy-install-grok-bot-factory.4",
+  "priority": 4,
+  "spec": "fn-1-easy-install-grok-bot-factory",
+  "spec_path": ".flow/tasks/fn-1-easy-install-grok-bot-factory.4.md",
+  "status": "todo",
+  "title": "Harness pin: grok-build + cursor-agent gpt-5.6-sol-high",
+  "updated_at": "2026-08-23T19:42:26.873618Z"
+}
