@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Fail if tracked files embed routine URL, sender key, tokens, PATs, sessions, or vault paths.
+# Planted values are assembled at runtime so complete embeddings are not in git.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -22,11 +23,21 @@ fail() {
   printf 'not ok %s %s\n' "$n" "$*"
 }
 
+_docs_host() {
+  case "$1" in
+    *://docs.github.com/*|*://docs.x.ai/*|*://flow-next.dev/*|*://cli.github.com/*|*://git-scm.com/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 # Return 0 if clean, 1 if a secret-like embedding is found.
 scan_path() {
-  local f="$1" hits
+  local f="$1" hits url
   [ -f "$f" ] || return 0
   [ -s "$f" ] || return 0
+
   hits=$(grep -nE \
     -e 'ghp_[A-Za-z0-9]{20,}' \
     -e 'gho_[A-Za-z0-9]{20,}' \
@@ -34,51 +45,113 @@ scan_path() {
     -e 'glpat-[A-Za-z0-9_-]{20,}' \
     -e 'whsec_[A-Za-z0-9+/=_-]{16,}' \
     -e '-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----' \
-    -e '(ROUTINE_URL|WEBHOOK_URL)[[:space:]]*=[[:space:]]*https?://' \
-    -e '(SENDER_KEY|sender_key|WEBHOOK_SECRET)[[:space:]]*=[[:space:]]*[^[:space:]"$<{][^[:space:]]+' \
-    -e '(SESSION_TOKEN|SESSION_ID|session_token|session_id)[[:space:]]*=[[:space:]]*[^[:space:]"$<{][^[:space:]]+' \
-    -e '(^|[=:[:space:]])(~/\.vault/|/[A-Za-z0-9._/-]+/\.vault/|/var/lib/vault/|op://[A-Za-z0-9._-]+/)' \
-    -e 'VAULT_(ADDR|TOKEN)[[:space:]]*=[[:space:]]*[^[:space:]"$<{][^[:space:]]+' \
-    -e 'hooks\.github\.com/' \
     "$f" 2>/dev/null || true)
   if [ -n "$hits" ]; then
     printf '%s\n' "$hits"
     return 1
   fi
+
+  hits=$(grep -nEi \
+    -e '(ROUTINE_URL|WEBHOOK_URL|SENDER_KEY|sender_key|WEBHOOK_SECRET|API_TOKEN|GITHUB_TOKEN|GH_TOKEN|AUTH_TOKEN|ACCESS_TOKEN|BOT_TOKEN|SESSION_TOKEN|SESSION_ID|session_token|session_id|VAULT_ADDR|VAULT_TOKEN)[[:space:]]*[=:][[:space:]]*[^[:space:]"$<{][^[:space:]]{11,}' \
+    -e '"(sender_key|routine_url|webhook_url|webhook_secret|api_token|github_token|session_token|session_id|vault_token|vault_addr)"[[:space:]]*:[[:space:]]*"[^"<${][^"]{11,}"' \
+    "$f" 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    printf '%s\n' "$hits"
+    return 1
+  fi
+
+  hits=$(grep -nE \
+    -e '(^|[=:[:space:]])(~/\.vault/|/[A-Za-z0-9._/-]+/\.vault/|/var/lib/vault/|op://[A-Za-z0-9._-]+/)' \
+    -e 'hooks\.github\.com/' \
+    -e 'api\.github.com/repos/[^[:space:]]+/hooks' \
+    "$f" 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    printf '%s\n' "$hits"
+    return 1
+  fi
+
+  while IFS= read -r url; do
+    [ -n "$url" ] || continue
+    if _docs_host "$url"; then
+      continue
+    fi
+    printf '%s\n' "$url"
+    return 1
+  done < <(grep -oE 'https?://[^[:space:]"'"'"']+(webhook|routine)[^[:space:]"'"'"']*' "$f" 2>/dev/null || true)
+
   return 0
 }
 
-# Planted embeddings must be detected (file is not git-tracked).
 plant() {
-  local label="$1" body="$2" out
+  local label="$1" body="$2"
   printf '%s\n' "$body" >"$TMP/planted"
-  if out=$(scan_path "$TMP/planted"); then
+  if scan_path "$TMP/planted" >/dev/null; then
     fail "$label (scanner missed planted secret)"
   else
     pass "$label"
   fi
 }
 
-plant "detects GitHub PAT" "token=ghp_abcdefghijklmnopqrstuvwxyz0123456789"
-plant "detects routine URL assignment" "ROUTINE_URL=https://example.invalid/webhook/abc"
-plant "detects sender key assignment" "SENDER_KEY=s3cr3tvalue0123456789abcd"
-plant "detects session token assignment" "session_token=abc123def456ghi789jkl012"
-plant "detects vault path" "file=/home/user/.vault/secrets/github"
-plant "detects VAULT_ADDR" "VAULT_ADDR=https://vault.example.invalid"
+# Fragments only — concatenated values must not appear as literals in this file.
+pfx=ghp_
+rest=abcdefghijklmnopqrstuvwxyz0123
+scheme=https://
+host=example.invalid
+wpath=/webhook/abc
+key=SENDER_KEY
+jkey=sender_key
+val=s3cr3tvalue0123456789abcd
+sk=session_token
+tk=API_TOKEN
+vk=VAULT_ADDR
+vp_home=/home/user
+vp_rest=.vault/secrets/github
 
-# Category names in docs are not embeddings.
+plant "detects GitHub PAT" "token=${pfx}${rest}"
+plant "detects routine URL assignment" "ROUTINE_URL=${scheme}${host}${wpath}"
+plant "detects bare routine URL" "${scheme}${host}${wpath}"
+plant "detects sender key assignment" "${key}=${val}"
+plant "detects JSON sender key" "\"${jkey}\": \"${val}\""
+plant "detects YAML sender key" "${jkey}: ${val}"
+plant "detects API_TOKEN assignment" "${tk}=${val}"
+plant "detects session token assignment" "${sk}=${val}"
+plant "detects vault path" "file=${vp_home}/${vp_rest}"
+plant "detects VAULT_ADDR" "${vk}=${scheme}vault.${host}"
+
+# Category names and documentation URLs are not embeddings.
 printf '%s\n' "Routine URL, sender key, tokens, PATs, sessions, and vault paths." >"$TMP/docs"
-if scan_path "$TMP/docs"; then
+if scan_path "$TMP/docs" >/dev/null; then
   pass "docs category names are not secrets"
 else
   fail "docs category names false-positive"
+fi
+
+printf '%s\n' "Payload URL = the routine URL" "Secret = the sender key from the panel" >"$TMP/handwire"
+if scan_path "$TMP/handwire" >/dev/null; then
+  pass "hand-wire prose is not a secret"
+else
+  fail "hand-wire prose false-positive"
+fi
+
+printf '%s\n' "https://docs.github.com/en/webhooks/webhook-events-and-payloads#push" >"$TMP/docurl"
+if scan_path "$TMP/docurl" >/dev/null; then
+  pass "docs.github.com webhook URL is not a secret"
+else
+  fail "docs.github.com webhook URL false-positive"
+fi
+
+printf '%s\n' "https://docs.x.ai/grok-bot/skills-routines-and-automations" >"$TMP/xaiurl"
+if scan_path "$TMP/xaiurl" >/dev/null; then
+  pass "docs.x.ai routine URL is not a secret"
+else
+  fail "docs.x.ai routine URL false-positive"
 fi
 
 # Tracked files must be clean (R15).
 tracked_dirty=0
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  if out=$(scan_path "$f"); then
+  if scan_path "$f" >/dev/null; then
     continue
   fi
   fail "tracked $f embeds a secret/url/key/vault path"
