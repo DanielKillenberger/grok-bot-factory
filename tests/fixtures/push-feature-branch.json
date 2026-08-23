@@ -1,0 +1,8 @@
+{
+  "ref": "refs/heads/feature/wake",
+  "after": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "deleted": false,
+  "repository": {
+    "full_name": "acme/widget"
+  }
+}

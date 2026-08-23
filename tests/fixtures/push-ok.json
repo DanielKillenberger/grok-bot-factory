@@ -1,0 +1,9 @@
+{
+  "ref": "refs/heads/master",
+  "after": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "deleted": false,
+  "repository": {
+    "full_name": "acme/widget",
+    "name": "widget"
+  }
+}
