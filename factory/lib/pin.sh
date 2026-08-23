@@ -122,7 +122,8 @@ review_pin_validate() {
       ;;
     cursor)
       if [ -z "$rest" ]; then
-        :
+        printf '%s\n' "unfulfillable review pin: cursor requires cursor:<model>" >&2
+        return 2
       elif [[ "$rest" == *:* ]]; then
         printf '%s\n' "unfulfillable review pin: cursor does not take effort" >&2
         return 2

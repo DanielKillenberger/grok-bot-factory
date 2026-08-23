@@ -198,6 +198,16 @@ fi
 
 # --- transport / stuck table ---
 fresh_log
+export FACTORY_STUB=membership_malformed
+run_gate "$FIX/push-ok.json"
+assert_stuck "malformed membership 200"
+
+fresh_log
+export FACTORY_STUB=truncated
+run_gate "$FIX/push-ok.json"
+assert_stuck "truncated directory listing"
+
+fresh_log
 export FACTORY_STUB=membership_403
 run_gate "$FIX/push-ok.json"
 assert_stuck "contents 403"

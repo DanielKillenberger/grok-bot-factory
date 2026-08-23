@@ -18,6 +18,7 @@ The factory is any repo you push to. Not a named-repo allowlist.
 2. In each product repo: GitHub **Settings → Webhooks → Add webhook**.
    - Payload URL = the routine URL
    - Secret = the sender key from the panel
+   - Content type = `application/json`
    - Events: **push** only
 3. That is a GitHub repo hook POSTing to a Grok Bot routine. Do not build a factory HTTP listener as the wake.
 

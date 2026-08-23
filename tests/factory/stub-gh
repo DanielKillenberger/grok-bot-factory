@@ -68,11 +68,15 @@ case "$scenario" in
   membership_404)
     http_err 404 "Not Found"
     ;;
+  membership_malformed)
+    printf '%s\n' '{"type":"file","name":".flow"}'
+    exit 0
+    ;;
 esac
 
 if path_has "repos/${repo}/contents/.flow" && ! path_has "contents/.flow/"; then
   case "$scenario" in
-    empty|pilot|land|mixed|unclassifiable|unready|malformed|partial|feature|missing_specs|bad_listing|bad_task)
+    empty|pilot|land|mixed|unclassifiable|unready|malformed|partial|feature|missing_specs|bad_listing|bad_task|truncated)
       dir_listing
       exit 0
       ;;
@@ -111,6 +115,10 @@ if path_has "repos/${repo}/contents/.flow/specs" && ! path_has "contents/.flow/s
       ;;
     partial)
       dir_listing spec-ready-pilot.json spec-ready-land.json
+      exit 0
+      ;;
+    truncated)
+      python3 -c 'import json; print(json.dumps([{"name":"n%04d"%i,"type":"file","path":"x/n%04d"%i} for i in range(1000)]))'
       exit 0
       ;;
     missing_specs)

@@ -26,9 +26,24 @@ membership_check() {
   fi
 
   rc=0
-  _factory_gh api --method GET "repos/${owner}/${repo}/contents/.flow" -f ref="$after" >/dev/null || rc=$?
+  body=$(_factory_gh api --method GET "repos/${owner}/${repo}/contents/.flow" -f ref="$after") || rc=$?
   case "$rc" in
-    0) return 0 ;;
+    0)
+      if ! printf '%s\n' "$body" | jq -e 'type=="array"' >/dev/null 2>&1; then
+        printf '%s\n' "membership: malformed contents for ${full_name} .flow at ${after}" >&2
+        return 2
+      fi
+      if ! printf '%s\n' "$body" | jq -e '
+        all(type=="object"
+            and (.name|type=="string")
+            and (.type|type=="string")
+            and (.type|IN("file","dir","symlink","submodule")))
+      ' >/dev/null 2>&1; then
+        printf '%s\n' "membership: malformed contents for ${full_name} .flow at ${after}" >&2
+        return 2
+      fi
+      return 0
+      ;;
     11) return 1 ;;
     12)
       printf '%s\n' "membership: contents 403 for ${full_name} .flow at ${after}" >&2

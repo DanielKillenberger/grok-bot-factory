@@ -35,6 +35,12 @@ _factory_list_json_dir() {
     printf '%s\n' "ready: malformed directory listing for ${path}" >&2
     return 2
   fi
+  # GitHub Contents directory listings cap at 1000 entries; a full-looking
+  # truncated array cannot positively establish "nothing ready".
+  if [ "$(printf '%s\n' "$body" | jq 'length')" -ge 1000 ]; then
+    printf '%s\n' "ready: incomplete directory listing for ${path}" >&2
+    return 2
+  fi
   printf '%s\n' "$body" | jq -c '
     [.[] | select(.type=="file" and (.name|test("^[A-Za-z0-9._-]+\\.json$"))) | .name]
   '

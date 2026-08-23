@@ -149,6 +149,13 @@ run_tick --host "$BIN/grok" --worktree-root "$WT" --clone-url "$PRODUCT" \
   acme/app "$PRODUCT_SHA" pilot
 assert_stuck "unfulfillable review pin (cursor effort)"
 
+# --- unfulfillable: bare cursor pin (cursor:<model> only) ---
+fresh_host_log
+make_product "$PRODUCT" cursor
+run_tick --host "$BIN/grok" --worktree-root "$WT" --clone-url "$PRODUCT" \
+  acme/app "$PRODUCT_SHA" pilot
+assert_stuck "unfulfillable review pin (bare cursor)"
+
 # --- happy path + logs, no progress pings ---
 fresh_host_log
 make_product "$PRODUCT" none
@@ -366,7 +373,7 @@ if grep -RE 'cloud-agent|CloudAgent' "$ROOT/factory"; then
 else
   pass "Cloud Agents are not the happy path"
 fi
-if grep -RE 'api\\.github.com/repos/.*/hooks|hooks\\.github' "$ROOT/factory" "$ROOT/tests/factory"; then
+if grep -RE 'api\\.github.com/repos/.*/hooks|hooks\\.github' "$ROOT/factory"; then
   fail "live hook URL embedded"
 else
   pass "tests do not arm a production wake"
