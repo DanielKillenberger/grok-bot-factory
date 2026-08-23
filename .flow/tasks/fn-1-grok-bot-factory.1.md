@@ -53,6 +53,7 @@ Deterministic GitHub-push wake gate: quiet 0 / start 10 (`repo sha kind`) / stuc
 
 baseline: red (tests/factory/gate.test.sh failed pre-edit: missing file — this task lands the suite)
 stage: impl-review - ran [2026-08-23T22:03:16Z NEEDS_WORK .. 2026-08-23T22:10:00Z SHIP]
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
 - Commits: 6a8ddfa4fe93696b55f063bba04e9963d5457fc1, 55baf3a79137fc7ddbf5cbce8c3edfbfa0c6496c, da15325400012c7bc390c1ffb8664f0ca8e57e9d
 - Tests: tests/factory/gate.test.sh
