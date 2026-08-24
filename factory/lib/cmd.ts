@@ -76,6 +76,17 @@ export function which(name: string): string | null {
   return Bun.which(name);
 }
 
+/** PATH-only lookup. Unlike Bun.which, a stripped PATH cannot still find /usr/bin. */
+export function whichOnPath(name: string, pathVar = process.env.PATH ?? ""): string | null {
+  if (!name || name.includes("/") || name.includes("\0")) return null;
+  for (const dir of pathVar.split(":")) {
+    if (!dir) continue;
+    const candidate = `${dir}/${name}`;
+    if (isExecutable(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function isExecutable(path: string): boolean {
   try {
     accessSync(path, fsConstants.X_OK);

@@ -9,6 +9,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { hostArgv } from "../../factory/lib/pin.ts";
+import { whichOnPath } from "../../factory/lib/cmd.ts";
 import { repoKey } from "../../factory/lib/worktree.ts";
 import {
   BUN,
@@ -148,8 +150,21 @@ test("grok host without /loop in help still probes as loop", async () => {
     .trim()
     .split("\n")
     .map((line) => JSON.parse(line) as string[]);
+  const grok = join(bin, "grok");
   const run = invokes.find((a) => a.some((arg) => arg.includes("/loop")));
-  expect(run).toEqual(["/loop 10m /flow-next:pilot"]);
+  expect(run).toEqual(["--always-approve", "--no-alt-screen", "/loop 10m /flow-next:pilot"]);
+  const wrapped = hostArgv(grok, "loop", "/flow-next:pilot");
+  expect(Array.isArray(wrapped)).toBe(true);
+  if (Array.isArray(wrapped)) {
+    expect(wrapped).toEqual([
+      whichOnPath("script") as string,
+      "-q",
+      "-e",
+      "-c",
+      `'${grok}' --always-approve --no-alt-screen '/loop 10m /flow-next:pilot'`,
+      "/dev/null",
+    ]);
+  }
 });
 
 test("generic fake host keeps Claude-shaped split /loop argv", async () => {
@@ -518,6 +533,30 @@ test("symlink-escape logs refused", async () => {
     "pilot",
   ]);
   expect(res.code).toBe(20);
+});
+
+test("missing script(1) is stuck for grok host", async () => {
+  const isolated = join(tmp, "no-script");
+  mkdirSync(isolated, { recursive: true });
+  linkStub(isolated, "grok", STUB_HOST);
+  writeFileSync(join(isolated, "git"), "#!/bin/sh\nexec /usr/bin/git \"$@\"\n", { mode: 0o755 });
+  const res = await runTick(
+    [
+      "--host",
+      join(isolated, "grok"),
+      "--worktree-root",
+      wt,
+      "--clone-url",
+      product,
+      "acme/app",
+      sha,
+      "pilot",
+    ],
+    { PATH: isolated },
+  );
+  expect(res.code).toBe(20);
+  expect(res.stderr.toLowerCase()).toMatch(/script/);
+  expect(res.stderr).toMatch(/PTY|pty/);
 });
 
 test("host nonzero is stuck", async () => {

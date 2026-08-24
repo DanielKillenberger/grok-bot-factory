@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { whichOnPath } from "../../factory/lib/cmd.ts";
 import {
+  hostArgv,
   hostProbe,
   hostRun,
   reviewPinValidate,
@@ -200,35 +202,81 @@ process.exit(0);
   );
 }
 
-test("hostRun grok loop is one prompt containing /loop", async () => {
+function expectOkRun(
+  ran: { code: number; stdout: string; stderr: string } | { error: string },
+): { code: number; stdout: string; stderr: string } {
+  expect("error" in ran, "error" in ran ? ran.error : "").toBe(false);
+  if ("error" in ran) throw new Error(ran.error);
+  return ran;
+}
+
+function expectGrokScriptArgv(host: string, drive: "loop" | "goal", skill: string): string[] {
+  const built = hostArgv(host, drive, skill);
+  expect(Array.isArray(built), Array.isArray(built) ? "" : built.error).toBe(true);
+  if (!Array.isArray(built)) throw new Error(built.error);
+  const scriptBin = whichOnPath("script");
+  expect(scriptBin).toBeTruthy();
+  const prompt = drive === "loop" ? `/loop 10m ${skill}` : `/goal ${skill}`;
+  expect(built).toEqual([
+    scriptBin as string,
+    "-q",
+    "-e",
+    "-c",
+    `'${host}' --always-approve --no-alt-screen '${prompt}'`,
+    "/dev/null",
+  ]);
+  return built;
+}
+
+test("hostRun grok loop is script PTY + one prompt", async () => {
   const grok = join(checkout, "grok");
   const argvLog = join(checkout, "argv.jsonl");
   writeArgvHost(grok, argvLog);
-  const ran = await hostRun(grok, "loop", "pilot", checkout);
+  expectGrokScriptArgv(grok, "loop", "/flow-next:pilot");
+  const ran = expectOkRun(await hostRun(grok, "loop", "pilot", checkout));
   expect(ran.code).toBe(0);
   const argv = JSON.parse(readFileSync(argvLog, "utf8").trim()) as string[];
-  expect(argv).toEqual(["/loop 10m /flow-next:pilot"]);
+  expect(argv).toEqual(["--always-approve", "--no-alt-screen", "/loop 10m /flow-next:pilot"]);
   expect(argv.join(" ")).toContain("/loop");
 });
 
-test("hostRun grok goal is one prompt", async () => {
+test("hostRun grok goal is script PTY + one prompt", async () => {
   const grok = join(checkout, "grok");
   const argvLog = join(checkout, "argv.jsonl");
   writeArgvHost(grok, argvLog);
-  const ran = await hostRun(grok, "goal", "land", checkout);
+  expectGrokScriptArgv(grok, "goal", "/flow-next:land");
+  const ran = expectOkRun(await hostRun(grok, "goal", "land", checkout));
   expect(ran.code).toBe(0);
-  expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual(["/goal /flow-next:land"]);
+  expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual([
+    "--always-approve",
+    "--no-alt-screen",
+    "/goal /flow-next:land",
+  ]);
 });
 
 test("hostRun generic inventory host keeps split argv", async () => {
   const claude = join(checkout, "claude");
   const argvLog = join(checkout, "argv.jsonl");
   writeArgvHost(claude, argvLog);
-  const ran = await hostRun(claude, "loop", "pilot", checkout);
+  expect(hostArgv(claude, "loop", "/flow-next:pilot")).toEqual([
+    claude,
+    "/loop",
+    "10m",
+    "/flow-next:pilot",
+  ]);
+  const ran = expectOkRun(await hostRun(claude, "loop", "pilot", checkout));
   expect(ran.code).toBe(0);
   expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual([
     "/loop",
     "10m",
     "/flow-next:pilot",
   ]);
+});
+
+
+
+test("whichOnPath does not find script on an empty PATH", () => {
+  expect(whichOnPath("script", "")).toBeNull();
+  expect(whichOnPath("script", "/tmp/no-such-bin")).toBeNull();
+  expect(whichOnPath("script")).toMatch(/\/script$/);
 });

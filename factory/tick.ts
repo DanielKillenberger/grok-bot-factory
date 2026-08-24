@@ -115,11 +115,16 @@ async function parseStart(
   stuck("missing gate start output");
 }
 
-function hostExitReason(code: number, stderr: string): string {
-  const line = stderr
+function firstHostReasonLine(text: string): string | undefined {
+  return text
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .find((l) => l.length > 0);
+    .find((l) => l.length > 0 && !/^(PILOT|LAND)_VERDICT=/.test(l));
+}
+
+function hostExitReason(code: number, stderr: string, stdout = ""): string {
+  // script(1) copies the child PTY to stdout, so grok's "stderr" may land there.
+  const line = firstHostReasonLine(stderr) ?? firstHostReasonLine(stdout);
   return line ? `host exited ${code}: ${line}` : `host exited ${code}`;
 }
 
@@ -209,13 +214,14 @@ export async function runTick(argv: string[]): Promise<void> {
     const routingBefore = routing.blocks.map((b) => ({ file: b.file, block: b.block }));
 
     const ran = await hostRun(resolved.bin, probed.drive, tick.kind, tick.tree);
+    if ("error" in ran) stuck(ran.error);
     if (ran.code !== 0) {
       try {
         tickLog(tick, "invoke", { rc: String(ran.code), verdict: "", drive: probed.drive });
       } catch {
         // ignore
       }
-      stuck(hostExitReason(ran.code, ran.stderr));
+      stuck(hostExitReason(ran.code, ran.stderr, ran.stdout));
     }
 
     const verdictRe = tick.kind === "land" ? /^LAND_VERDICT=/ : /^PILOT_VERDICT=/;

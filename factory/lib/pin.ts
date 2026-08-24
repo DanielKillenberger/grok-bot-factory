@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { isExecutable, runCmd, which } from "./cmd.ts";
+import { isExecutable, runCmd, which, whichOnPath } from "./cmd.ts";
 
 export const HOST_INVENTORY = [
   "claude",
@@ -216,11 +216,26 @@ export function routingBlockValidate(
   return { ok: true };
 }
 
-function hostArgv(host: string, drive: HostDrive, skill: string): string[] {
+function shQuote(value: string): string {
+  return "'" + value.replaceAll("'", "'\\''") + "'";
+}
+
+export function hostArgv(
+  host: string,
+  drive: HostDrive,
+  skill: string,
+): string[] | { error: string } {
   // Grok Build slash commands are one prompt string. Claude-shaped hosts take
   // split argv (`/loop` `10m` <skill> or `/goal` <skill>).
   if (hostBasename(host) === "grok") {
-    return drive === "loop" ? [host, `/loop 10m ${skill}`] : [host, `/goal ${skill}`];
+    // grok 1.0.5 opens /dev/tty and exits ENXIO without a PTY. script(1) gives
+    // one. --always-approve so a factory tick cannot block on a permission
+    // prompt. Missing script(1) is stuck — never drop to no-TTY grok.
+    const scriptBin = whichOnPath("script");
+    if (!scriptBin) return { error: "script(1) missing; grok needs a PTY" };
+    const prompt = drive === "loop" ? `/loop 10m ${skill}` : `/goal ${skill}`;
+    const cmd = `${shQuote(host)} --always-approve --no-alt-screen ${shQuote(prompt)}`;
+    return [scriptBin, "-q", "-e", "-c", cmd, "/dev/null"];
   }
   return drive === "loop" ? [host, "/loop", "10m", skill] : [host, "/goal", skill];
 }
@@ -230,9 +245,10 @@ export async function hostRun(
   drive: HostDrive,
   kind: "pilot" | "land",
   tree: string,
-): Promise<{ code: number; stdout: string; stderr: string }> {
+): Promise<{ code: number; stdout: string; stderr: string } | { error: string }> {
   const skill = kind === "land" ? "/flow-next:land" : "/flow-next:pilot";
   const argv = hostArgv(host, drive, skill);
+  if (!Array.isArray(argv)) return argv;
   // Host ticks can run for a long time; do not apply the gh/git command deadline.
   return runCmd(argv, {
     cwd: tree,
