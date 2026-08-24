@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  hostProbe,
   reviewPinValidate,
   routingBlockRead,
   routingBlockValidate,
@@ -157,4 +158,31 @@ test("routingBlockRead inspects AGENTS.md even when CLAUDE.md is valid", () => {
   );
   const result = routingBlockRead(checkout);
   expect("error" in result).toBe(true);
+});
+
+test("grok-named stub without /loop in help probes as loop", async () => {
+  const grok = join(checkout, "grok");
+  writeFileSync(grok, "#!/bin/sh\necho usage: grok\n", { mode: 0o755 });
+  expect(await hostProbe(grok)).toEqual({ drive: "loop" });
+});
+
+test("inventory host without /loop or /goal still fails probe", async () => {
+  const claude = join(checkout, "claude");
+  writeFileSync(claude, "#!/bin/sh\necho usage: claude\n", { mode: 0o755 });
+  const result = await hostProbe(claude);
+  expect("error" in result).toBe(true);
+});
+
+test("missing host still fails probe", async () => {
+  const result = await hostProbe(join(checkout, "no-such-host"));
+  expect("error" in result).toBe(true);
+  if ("error" in result) expect(result.error).toMatch(/missing/);
+});
+
+test("unexecutable grok still fails probe", async () => {
+  const grok = join(checkout, "grok");
+  writeFileSync(grok, "#!/bin/sh\necho usage: grok\n", { mode: 0o644 });
+  const result = await hostProbe(grok);
+  expect("error" in result).toBe(true);
+  if ("error" in result) expect(result.error).toMatch(/missing/);
 });

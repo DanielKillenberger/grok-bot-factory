@@ -117,8 +117,28 @@ test("missing host CLI", async () => {
 });
 
 test("host without /loop or /goal", async () => {
-  const res = await runTick(tickArgs(), { FACTORY_HOST_HELP: "none" });
+  linkStub(bin, "claude", STUB_HOST);
+  const res = await runTick(
+    [
+      "--host",
+      join(bin, "claude"),
+      "--worktree-root",
+      wt,
+      "--clone-url",
+      product,
+      "acme/app",
+      sha,
+      "pilot",
+    ],
+    { FACTORY_HOST_HELP: "none" },
+  );
   expect(res.code).toBe(20);
+});
+
+test("grok host without /loop in help still probes as loop", async () => {
+  const res = await runTick(tickArgs(), { FACTORY_HOST_HELP: "none" });
+  expect(res.code, res.stderr).toBe(0);
+  expect(readFileSync(hostLog, "utf8")).toContain("/loop");
 });
 
 test("unfulfillable review pin (unknown backend)", async () => {

@@ -53,6 +53,10 @@ export async function hostProbe(
   if (!bin || !isExecutable(bin)) return { error: "missing host CLI" };
   const base = hostBasename(bin);
   if (!inInventory(base)) return { error: "host cannot run /loop or /goal" };
+  // Grok Build (basename `grok`) has /loop and /goal as slash commands, same
+  // idea as Claude Code, but `grok --help` does not print those strings.
+  // Inventory + grok basename is enough; drive is loop.
+  if (base === "grok") return { drive: "loop" };
   const help = await runCmd([bin, "--help"]);
   const drive = driveFromHelp(`${help.stdout}\n${help.stderr}`);
   if (!drive) return { error: "host cannot run /loop or /goal" };
