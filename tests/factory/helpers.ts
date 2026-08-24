@@ -149,7 +149,7 @@ export async function makeProduct(
     writeFileSync(
       join(dir, "CLAUDE.md"),
       `<!-- flow-next:model-routing:start -->
-<!-- reviewer: example -->
+<!-- reviewer: none -->
 <!-- flow-next:model-routing:end -->
 `,
     );

@@ -188,9 +188,9 @@ export async function runTick(argv: string[]): Promise<void> {
     if ("error" in pinOk) stuck("unfulfillable review pin");
 
     const routing = routingBlockRead(tick.tree);
-    if (routing.error) stuck(routing.error);
-    if (routing.block) {
-      const routeOk = routingBlockValidate(routing.block.block, resolved.bin);
+    if ("error" in routing) stuck(routing.error);
+    for (const rb of routing.blocks) {
+      const routeOk = routingBlockValidate(rb.block, resolved.bin);
       if ("error" in routeOk) stuck("unfulfillable review pin");
     }
     tickLog(tick, "pin", { backend: pin.pin });
@@ -198,8 +198,7 @@ export async function runTick(argv: string[]): Promise<void> {
     const cfg = join(tick.tree, ".flow/config.json");
     const pinBefore = pin.pin;
     const cfgExisted = existsSync(cfg);
-    const routingFile = routing.block?.file ?? "";
-    const routingBefore = routing.block?.block ?? "";
+    const routingBefore = routing.blocks.map((b) => ({ file: b.file, block: b.block }));
 
     const ran = await hostRun(resolved.bin, probed.drive, tick.kind, tick.tree);
     if (ran.code !== 0) {
@@ -224,11 +223,24 @@ export async function runTick(argv: string[]): Promise<void> {
       if ("error" in afterPin) stuck("unfulfillable review pin");
       if (afterPin.pin !== pinBefore) stuck("review pin overwritten");
     }
-    if (routingFile) {
-      if (!existsSync(routingFile)) stuck("routing block overwritten");
+    if (routingBefore.length > 0) {
+      for (const before of routingBefore) {
+        if (!existsSync(before.file)) stuck("routing block overwritten");
+      }
       const afterRoute = routingBlockRead(tick.tree);
-      if (afterRoute.error) stuck("routing block overwritten");
-      if ((afterRoute.block?.block ?? "") !== routingBefore) stuck("routing block overwritten");
+      if ("error" in afterRoute) stuck("routing block overwritten");
+      if (afterRoute.blocks.length !== routingBefore.length) {
+        stuck("routing block overwritten");
+      }
+      for (let i = 0; i < routingBefore.length; i++) {
+        const after = afterRoute.blocks[i];
+        if (
+          after.file !== routingBefore[i].file ||
+          after.block !== routingBefore[i].block
+        ) {
+          stuck("routing block overwritten");
+        }
+      }
     }
 
     if (verdict === "NO_WORK") {

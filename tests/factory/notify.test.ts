@@ -193,6 +193,42 @@ test("from-exit BLOCKED → NEEDS_HUMAN", async () => {
   expect(JSON.parse(res.stdout).event).toBe("NEEDS_HUMAN");
 });
 
+test("from-exit 1 → NEEDS_HUMAN", async () => {
+  const res = await runNotify(["--from-exit", "1"]);
+  expect(res.code).toBe(0);
+  expect(JSON.parse(res.stdout).event).toBe("NEEDS_HUMAN");
+});
+
+test("from-exit 127 → NEEDS_HUMAN", async () => {
+  const res = await runNotify(["--from-exit", "127"]);
+  expect(res.code).toBe(0);
+  expect(JSON.parse(res.stdout).event).toBe("NEEDS_HUMAN");
+});
+
+test("from-exit 99 → NEEDS_HUMAN", async () => {
+  const res = await runNotify(["--from-exit", "99"]);
+  expect(res.code).toBe(0);
+  expect(JSON.parse(res.stdout).event).toBe("NEEDS_HUMAN");
+});
+
+test("from-exit abc is stuck", async () => {
+  const res = await runNotify(["--from-exit", "abc"]);
+  expect(res.code).not.toBe(0);
+  expect(trimNL(res.stdout)).toBe("");
+});
+
+test("from-exit 20x is stuck", async () => {
+  const res = await runNotify(["--from-exit", "20x"]);
+  expect(res.code).not.toBe(0);
+  expect(trimNL(res.stdout)).toBe("");
+});
+
+test("from-exit empty is stuck", async () => {
+  const res = await runNotify(["--from-exit="]);
+  expect(res.code).not.toBe(0);
+  expect(trimNL(res.stdout)).toBe("");
+});
+
 test("dirty-tree reason → NEEDS_HUMAN", async () => {
   const res = await runNotify(["--from-exit", "20", "--reason", "dirty working tree at tick start"]);
   expect(JSON.parse(res.stdout).event).toBe("NEEDS_HUMAN");

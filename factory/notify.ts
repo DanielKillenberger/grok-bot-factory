@@ -8,13 +8,14 @@ const ALLOWED = new Set(["event", "reason", "from-exit"]);
 const OWNER_GATED = new Set(["DEFERRED_TO_LAND", "send", "pay", "publish", "merge"]);
 
 function classifyFromExit(fromExit: string, reason: string): string | "quiet" {
+  if (!/^[0-9]+$/.test(fromExit)) stuck("invalid --from-exit");
   if (fromExit === "0" || fromExit === "10") return "quiet";
   if (fromExit === "20") {
     if (/host verdict ASKED(\s|$)/.test(reason)) return "ASKED";
     if (/host verdict DEFERRED_TO_LAND(\s|$)/.test(reason)) return "DEFERRED_TO_LAND";
     return "NEEDS_HUMAN";
   }
-  return "quiet";
+  return "NEEDS_HUMAN";
 }
 
 function normalizeEvent(event: string): string | "quiet" {
@@ -90,12 +91,16 @@ export async function runNotify(argv: string[]): Promise<void> {
 
   let event = flags.get("event") ?? "";
   const reason = flags.get("reason") ?? "";
-  const fromExit = flags.get("from-exit") ?? "";
 
-  if (!event && fromExit) {
-    const mapped = classifyFromExit(fromExit, reason);
-    if (mapped === "quiet") quiet();
-    event = mapped;
+  if (flags.has("from-exit")) {
+    const fromExit = flags.get("from-exit") ?? "";
+    if (!event) {
+      const mapped = classifyFromExit(fromExit, reason);
+      if (mapped === "quiet") quiet();
+      event = mapped;
+    } else if (!/^[0-9]+$/.test(fromExit)) {
+      stuck("invalid --from-exit");
+    }
   }
 
   const normalized = normalizeEvent(event);

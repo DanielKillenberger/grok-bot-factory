@@ -168,6 +168,84 @@ test("malformed routing block is stuck", async () => {
   expect(res.stderr.toLowerCase()).toMatch(/routing|pin/);
 });
 
+test("empty pin segment codex: is stuck even if codex is on PATH", async () => {
+  writeFileSync(join(bin, "codex"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  sha = await makeProduct(product, "codex:");
+  const res = await runTick(tickArgs());
+  expect(res.code).toBe(20);
+  expect(res.stderr.toLowerCase()).toContain("pin");
+});
+
+test("invalid routing assignment is stuck", async () => {
+  writeFileSync(
+    join(product, "CLAUDE.md"),
+    `<!-- flow-next:model-routing:start -->
+<!-- reviewer: bogus -->
+<!-- flow-next:model-routing:end -->
+`,
+  );
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"]);
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "bogus-route"]);
+  sha = trimNL((await git(["-C", product, "rev-parse", "HEAD"])).stdout);
+  const res = await runTick(tickArgs());
+  expect(res.code).toBe(20);
+});
+
+test("routing block with no assignment is stuck", async () => {
+  writeFileSync(
+    join(product, "CLAUDE.md"),
+    `<!-- flow-next:model-routing:start -->
+<!-- flow-next:model-routing:end -->
+`,
+  );
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"]);
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "empty-route"]);
+  sha = trimNL((await git(["-C", product, "rev-parse", "HEAD"])).stdout);
+  const res = await runTick(tickArgs());
+  expect(res.code).toBe(20);
+});
+
+test("invalid AGENTS.md routing is stuck even when CLAUDE.md is valid", async () => {
+  writeFileSync(
+    join(product, "AGENTS.md"),
+    `<!-- flow-next:model-routing:start -->
+<!-- reviewer: bogus -->
+<!-- flow-next:model-routing:end -->
+`,
+  );
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"]);
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "agents-bogus"]);
+  sha = trimNL((await git(["-C", product, "rev-parse", "HEAD"])).stdout);
+  const res = await runTick(tickArgs());
+  expect(res.code).toBe(20);
+});
+
+test("both CLAUDE.md and AGENTS.md routing blocks are preserved", async () => {
+  writeFileSync(
+    join(product, "CLAUDE.md"),
+    `<!-- flow-next:model-routing:start -->
+<!-- reviewer: none -->
+<!-- flow-next:model-routing:end -->
+`,
+  );
+  writeFileSync(
+    join(product, "AGENTS.md"),
+    `<!-- flow-next:model-routing:start -->
+<!-- backend: none -->
+<!-- flow-next:model-routing:end -->
+`,
+  );
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"]);
+  await git(["-C", product, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "both-route"]);
+  sha = trimNL((await git(["-C", product, "rev-parse", "HEAD"])).stdout);
+  const claudeBefore = readFileSync(join(product, "CLAUDE.md"), "utf8");
+  const agentsBefore = readFileSync(join(product, "AGENTS.md"), "utf8");
+  const res = await runTick(tickArgs());
+  expect(res.code, res.stderr).toBe(0);
+  expect(readFileSync(join(product, "CLAUDE.md"), "utf8")).toBe(claudeBefore);
+  expect(readFileSync(join(product, "AGENTS.md"), "utf8")).toBe(agentsBefore);
+});
+
 test("pilot tick NO_WORK", async () => {
   const pinBefore = readFileSync(join(product, ".flow/config.json"), "utf8");
   const routingBefore = readFileSync(join(product, "CLAUDE.md"), "utf8");

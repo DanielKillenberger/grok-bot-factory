@@ -118,6 +118,11 @@ export function reviewPinValidate(
 ): { ok: true } | { error: string } {
   if (!spec) return { ok: true };
   const parts = spec.split(":");
+  // Grammar is backend[:model[:effort]]. Every split component must be non-empty
+  // before PATH/binary probes so `codex:` / `copilot::` fail closed even if the CLI exists.
+  if (parts.some((part) => part.length === 0)) {
+    return { error: "unfulfillable review pin: empty pin segment" };
+  }
   const backend = parts[0];
   if (!BACKENDS.has(backend)) {
     return { error: "unfulfillable review pin: unknown backend" };
@@ -158,7 +163,8 @@ function routingFiles(checkout: string): string[] {
 
 export function routingBlockRead(
   checkout: string,
-): { block?: RoutingBlock; error?: string; none?: true } {
+): { blocks: RoutingBlock[] } | { error: string } {
+  const blocks: RoutingBlock[] = [];
   for (const file of routingFiles(checkout)) {
     if (!existsSync(file)) continue;
     let text: string;
@@ -179,9 +185,9 @@ export function routingBlockRead(
     let endLine = text.indexOf("\n", endIdx);
     if (endLine < 0) endLine = text.length;
     const block = text.slice(startLine, endLine);
-    return { block: { file, block } };
+    blocks.push({ file, block });
   }
-  return { none: true };
+  return { blocks };
 }
 
 export function routingBlockValidate(
@@ -190,11 +196,18 @@ export function routingBlockValidate(
 ): { ok: true } | { error: string } {
   ROUTING_ASSIGN_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
+  let found = false;
   while ((m = ROUTING_ASSIGN_RE.exec(block))) {
     const value = m[1].replace(/[.,;]+$/, "");
-    if (!PIN_TOKEN_RE.test(value)) continue;
+    if (!PIN_TOKEN_RE.test(value)) {
+      return { error: "unfulfillable review pin: invalid routing assignment" };
+    }
     const checked = reviewPinValidate(value, hostBin);
     if ("error" in checked) return checked;
+    found = true;
+  }
+  if (!found) {
+    return { error: "unfulfillable review pin: routing block has no assignment" };
   }
   return { ok: true };
 }
