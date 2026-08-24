@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { isExecutable, runCmd, which, whichOnPath } from "./cmd.ts";
 
@@ -225,6 +226,59 @@ export function hostTypescriptPath(tree: string): string {
   return join(dirname(tree), "host.typescript");
 }
 
+/**
+ * Grok writes the session transcript under
+ * ~/.grok/sessions/<encodeURIComponent(realpath(tree))>/<session-id>/.
+ * Watch only that tree-encoded directory — never all of ~/.grok.
+ */
+export function grokSessionsDir(tree: string): string {
+  const home = process.env.HOME && process.env.HOME.length > 0 ? process.env.HOME : homedir();
+  let real = tree;
+  try {
+    real = realpathSync(tree);
+  } catch {
+    // tree may not exist yet; encode the path we were given
+  }
+  return join(home, ".grok", "sessions", encodeURIComponent(real));
+}
+
+const SESSION_LOG_NAMES = new Set(["chat_history.jsonl", "updates.jsonl"]);
+
+function listSessionLogs(root: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, depth: number) => {
+    if (depth > 8) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isSymbolicLink()) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p, depth + 1);
+      else if (e.isFile() && SESSION_LOG_NAMES.has(e.name)) out.push(p);
+    }
+  };
+  walk(root, 0);
+  return out;
+}
+
+function extractSessionVerdict(root: string): string | undefined {
+  for (const file of listSessionLogs(root)) {
+    let text = "";
+    try {
+      text = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    const found = extractVerdictLine(text);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 function extractVerdictLine(text: string): string | undefined {
   for (const raw of text.split(/\r\n|\n|\r/)) {
     const trimmed = raw.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").trim();
@@ -327,7 +381,7 @@ async function pumpStream(
 
 async function runGrokHost(
   argv: readonly string[],
-  opts: { cwd: string; typescript: string; timeoutMs: number },
+  opts: { cwd: string; typescript: string; sessionsDir: string; timeoutMs: number },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   writeFileSync(opts.typescript, "");
   const proc = Bun.spawn([...argv], {
@@ -365,7 +419,9 @@ async function runGrokHost(
       tsText = "";
     }
     const found =
-      extractVerdictLine(stdoutChunks.join("")) ?? extractVerdictLine(tsText);
+      extractVerdictLine(stdoutChunks.join("")) ??
+      extractVerdictLine(tsText) ??
+      extractSessionVerdict(opts.sessionsDir);
     if (!found) return;
     verdict = found;
     // A host that prints a verdict and exits (including nonzero) must keep that
@@ -448,7 +504,12 @@ export async function hostRun(
   const timeoutMs = Number(process.env.FACTORY_HOST_TIMEOUT_MS ?? 3_600_000);
   // Host ticks can run for a long time; do not apply the gh/git command deadline.
   if (typescript) {
-    return runGrokHost(argv, { cwd: tree, typescript, timeoutMs });
+    return runGrokHost(argv, {
+      cwd: tree,
+      typescript,
+      sessionsDir: grokSessionsDir(tree),
+      timeoutMs,
+    });
   }
   return runCmd(argv, {
     cwd: tree,

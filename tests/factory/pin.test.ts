@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { whichOnPath } from "../../factory/lib/cmd.ts";
 import {
+  grokSessionsDir,
   hostArgv,
   hostProbe,
   hostRun,
@@ -326,6 +327,71 @@ sleep 120
 }, 15_000);
 
 
+
+test("grok session watch path is encodeURIComponent(realpath(tree))", () => {
+  const tree = makeTree();
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  try {
+    const dir = grokSessionsDir(tree);
+    const encoded = encodeURIComponent(realpathSync(tree));
+    expect(dir).toBe(join(fakeHome, ".grok", "sessions", encoded));
+    expect(dir.startsWith(join(fakeHome, ".grok", "sessions") + "/")).toBe(true);
+    expect(dir.endsWith(encoded)).toBe(true);
+    expect(dir.includes("/.grok/sessions/")).toBe(true);
+    expect(dir).not.toBe(join(fakeHome, ".grok"));
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+  }
+});
+
+test("hostRun stops a hanging grok after PILOT_VERDICT in session chat_history.jsonl", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "session-hang.pid");
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const sessionFile = join(grokSessionsDir(tree), "sess-test", "chat_history.jsonl");
+  const line = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="session-stub"';
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > ${JSON.stringify(marker)}
+mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-test"))}
+cat > ${JSON.stringify(sessionFile)} << 'EOF'
+{"type":"assistant","content":"no verdict in this json field"}
+${line}
+EOF
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    expect(Date.now() - t0).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const got = ran.stdout.split(/\r?\n/).find((l) => l.startsWith("PILOT_VERDICT="));
+    expect(got).toBe(line);
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
 
 test("whichOnPath does not find script on an empty PATH", () => {
   expect(whichOnPath("script", "")).toBeNull();
