@@ -1,8 +1,10 @@
 # grok-bot-factory
 
-Public runbook. Copy these steps. The factory is a runbook plus the Grok Bot supervisor. A dashboard is welcome later.
+This repo ships the factory program: a deterministic wake gate, an isolated tick runner, and stuck/owner-gated notify. Grok Bot skills invoke that program; they are not a substitute for the gate.
 
-Grok Bot coordinates. Building happens in `grok` + `cursor-agent`. The host is `/loop` or `/goal`. That host calls `/flow-next:pilot` once per tick. Grok Bot is not the loop. The supervisor is not the tick. Do not implement in Grok Bot chat.
+Copy these steps. Easy-install is later and is not required. A dashboard is welcome later.
+
+The **builder** Grok Bot owns the webhook routine and supervises. Product work happens in a documented flow-next host (`/loop` or `/goal` calling `/flow-next:pilot` or `/flow-next:land`), not in Grok Bot chat. The host CLI is instance-configurable (flag/env; default = a documented host already on the builder machine). The product review pin is the checkout’s `.flow/config.json` `review.backend` plus instruction-file routing — not the host CLI, and not a hardcoded review model.
 
 ## Queue
 
@@ -12,14 +14,17 @@ The factory is any repo you push to. Not a named-repo allowlist.
 
 ## Wake (happy path)
 
-1. In Grok Bot, create one routine with trigger type `webhook`. Copy the URL and sender key from the **routine panel**. Do not put them in git.
+1. In Grok Bot, create one routine with trigger type `webhook` on the **builder**. Copy the URL and sender key from the **routine panel**. Do not put them in git.
 2. In each product repo: GitHub **Settings → Webhooks → Add webhook**.
    - Payload URL = the routine URL
    - Secret = the sender key from the panel
+   - Content type = `application/json`
    - Events: **push** only
 3. That is a GitHub repo hook POSTing to a Grok Bot routine. Do not build a factory HTTP listener as the wake.
 
-On fire: the routine looks for **ready** specs/tasks only (via `gh`, no clone). If none, stay quiet. If one is sitting, the supervisor starts `/loop` or `/goal` on a checkout. Stay quiet unless a human decision is needed.
+The factory program is TypeScript on Bun. The routine’s **first action** is exec of `factory/gate.ts` on the delivered GitHub push body — no model (`bun factory/gate.ts`, or the file shebang). If the routine panel cannot exec a command before a model, stop (do not start a model to run the gate).
+
+On fire: if the gate is quiet, stay quiet. If it starts, the builder runs `factory/tick.ts` on an isolated worktree via the instance host CLI. Stay quiet unless a human decision is needed.
 
 ## Add a repo
 
@@ -27,17 +32,23 @@ Add the same GitHub webhook on the new `owner/name`, same routine URL. Do not fr
 
 ## On fire (supervisor)
 
-1. Check ready specs/tasks only. Skip drafts.
-2. If none: stop. No status ping.
-3. If one is sitting: checkout if needed, start `/loop` or `/goal` (review pin: `cursor:gpt-5.6-sol-high`). Never bare `agent`.
-4. Implementer: `grok` (grok-4.6). Reviewer: Cursor Sol. Never both local and cloud.
-5. Cloud Agents only if the CLIs cannot. Then two CloudAgents: implementer grok-4.6, reviewer gpt-5.6-sol.
+1. Exec `factory/gate.ts` on the push body. No model.
+2. If none ready (exit 0): stop. No status ping.
+3. If stuck (exit 20): notify `NEEDS_HUMAN` (builder → main → human). Preserve the reason.
+4. If start (exit 10): new isolated worktree, run `factory/tick.ts` via the instance host CLI (flag/env; default = a documented host already on this machine). Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin. Do not infer the host from `review.backend`.
+5. Cloud Agents only if that instance host CLI cannot run.
 
 `/flow-next:pilot` is one tick. `/loop` or `/goal` calls it each tick until `NO_WORK`, `NEEDS_HUMAN`, or `DEFERRED_TO_LAND`.
 
 ## Notify
 
-Ping the owner only when something needs a decision: `NEEDS_HUMAN`, `ASKED`, or an owner-gated act (send, pay, publish, merge). Otherwise just ship. No “picked up”, no “still running”, no “PR opened”.
+Ping only when something needs a decision: `NEEDS_HUMAN`, `ASKED`, or an owner-gated act (send, pay, publish, merge). `DEFERRED_TO_LAND` is owner-gated merge. Dirty-tree / `BLOCKED` at tick start maps to `NEEDS_HUMAN`. Path: builder Grok Bot handoff to main; if main cannot resolve, a human. Main does not own the routine.
+
+No “picked up”, no “still running”, no “PR opened”.
+
+## Easy-install (later)
+
+Not required. Manual wiring above is enough.
 
 ## Footnotes (not the path)
 
@@ -45,8 +56,14 @@ Cursor GitHub *listeners* have no raw git-push event (PR opened/pushed/merged on
 
 ## Do not put in git
 
-Routine URL, sender key, tokens, PATs, sessions. Those stay in the Grok Bot routine panel and GitHub webhook settings.
+Routine URL, sender key, tokens, PATs, sessions, and vault paths. Those stay in the Grok Bot routine panel, GitHub webhook settings, and the instance vault — not this repo.
+
+## Tests
+
+```bash
+bun test
+```
 
 ## Do not arm from this README
 
-Creating the Grok Bot webhook routine is a separate yes. This repo is the runbook only.
+Creating the Grok Bot webhook routine is a separate yes. Implementing or reading this repo does not arm a production wake.

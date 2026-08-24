@@ -1,0 +1,8 @@
+{
+  "ref": "refs/heads/tmp",
+  "after": "0123456789abcdef0123456789abcdef01234567",
+  "deleted": true,
+  "repository": {
+    "full_name": "acme/app"
+  }
+}

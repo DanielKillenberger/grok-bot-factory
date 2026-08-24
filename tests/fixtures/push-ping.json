@@ -1,0 +1,11 @@
+{
+  "zen": "Speak like a human.",
+  "hook_id": 1,
+  "hook": {
+    "type": "Repository",
+    "id": 1
+  },
+  "repository": {
+    "full_name": "acme/app"
+  }
+}

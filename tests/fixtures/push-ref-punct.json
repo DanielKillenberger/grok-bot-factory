@@ -1,0 +1,8 @@
+{
+  "ref": "refs/heads/release;2026",
+  "after": "0123456789abcdef0123456789abcdef01234567",
+  "deleted": false,
+  "repository": {
+    "full_name": "acme/app"
+  }
+}

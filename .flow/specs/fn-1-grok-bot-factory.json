@@ -1,14 +1,18 @@
 {
   "branch_name": "fn-1-grok-bot-factory",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-08-23T23:13:20.736657Z",
   "created_at": "2026-08-23T19:41:50.692064Z",
   "default_impl": null,
   "default_review": null,
   "default_sync": null,
   "depends_on_epics": [],
   "id": "fn-1-grok-bot-factory",
-  "impl_review_rounds": {},
+  "impl_review_rounds": {
+    "fn-1-grok-bot-factory.1": 0,
+    "fn-1-grok-bot-factory.2": 0,
+    "fn-1-grok-bot-factory.3": 0
+  },
   "next_task": 1,
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
@@ -359,15 +363,799 @@
       "task": null,
       "timestamp": "2026-08-23T21:32:17.744141Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "ed170e8a99a13f3887b2991038ffd5856a9e030449e76dceacd4587a4bae16ba",
+      "backend": "codex",
+      "base_sha": "e45dbb5d75359496fb945e2a056482e07fb752ae",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "classification": "introduced",
+            "findingId": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-e3067472b3e95b3f127276eefe86306d",
+            "classification": "introduced",
+            "findingId": "finding-e3067472b3e95b3f127276eefe86306d",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "classification": "introduced",
+            "findingId": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-33431264ddc82ad2390b41705b2cc625",
+            "classification": "introduced",
+            "findingId": "finding-33431264ddc82ad2390b41705b2cc625",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "6a8ddfa4fe93696b55f063bba04e9963d5457fc1",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 118519,
+      "output_sha256": "ecf26f6e00fd99b311f1364534781fd471bae4fb421499aefcfeee543564efb9",
+      "reservation_id": "2a2a9390890d4255acad6fca80baa0eb",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.1",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.1",
+      "timestamp": "2026-08-23T22:03:16.190522Z",
+      "tool_calls": 9,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "3066eeb6aa9b8b9c117012bf696259f753446fd2b7a7cfa515d7d8462001ec57",
+      "backend": "codex",
+      "base_sha": "e45dbb5d75359496fb945e2a056482e07fb752ae",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "classification": "introduced",
+            "findingId": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-e3067472b3e95b3f127276eefe86306d",
+            "classification": "introduced",
+            "findingId": "finding-e3067472b3e95b3f127276eefe86306d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "classification": "introduced",
+            "findingId": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-33431264ddc82ad2390b41705b2cc625",
+            "classification": "introduced",
+            "findingId": "finding-33431264ddc82ad2390b41705b2cc625",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "da15325400012c7bc390c1ffb8664f0ca8e57e9d",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1023,
+      "output_sha256": "946cafe93ec705381821920e2e90e0d18b0a90044f7540a2fd21aa3a2e53dd80",
+      "reservation_id": "8ccf1f59b1ec47f9a0070f7ab55ae0bd",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.1",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.1",
+      "timestamp": "2026-08-23T22:09:32.725387Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "3066eeb6aa9b8b9c117012bf696259f753446fd2b7a7cfa515d7d8462001ec57",
+      "backend": "codex",
+      "base_sha": "e45dbb5d75359496fb945e2a056482e07fb752ae",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "classification": "introduced",
+            "findingId": "finding-830e92e7004f32c7d811bc23c8214ff2",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-e3067472b3e95b3f127276eefe86306d",
+            "classification": "introduced",
+            "findingId": "finding-e3067472b3e95b3f127276eefe86306d",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "classification": "introduced",
+            "findingId": "finding-53c9ebeaa5322387b1b6aa2abb034fa7",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-33431264ddc82ad2390b41705b2cc625",
+            "classification": "introduced",
+            "findingId": "finding-33431264ddc82ad2390b41705b2cc625",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "da15325400012c7bc390c1ffb8664f0ca8e57e9d",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 93064,
+      "output_sha256": "6f1373817ae105d4cdf650e58e4d91d6047ec8836500954a15d3abb533c238da",
+      "reservation_id": "426fd31accb0465e88a70653fbf2c295",
+      "round_consumed": false,
+      "scope": "impl:fn-1-grok-bot-factory.1",
+      "superseded_by": "8ccf1f59b1ec47f9a0070f7ab55ae0bd",
+      "task": "fn-1-grok-bot-factory.1",
+      "timestamp": "2026-08-23T22:11:24.530292Z",
+      "tool_calls": 5,
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "1d93fb33e24fa3a1d4f91af785315db2d5fc6491282e1fe85a4ec454f8a11c2c",
+      "backend": "codex",
+      "base_sha": "3addb61db8b299d510b87fe5cd1bab4f9b57b1c3",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-927f97febd87657586aeffcd3d92851e",
+            "classification": "introduced",
+            "findingId": "finding-927f97febd87657586aeffcd3d92851e",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-311ce5b94aba488981625c8900055871",
+            "classification": "introduced",
+            "findingId": "finding-311ce5b94aba488981625c8900055871",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-476ea9f087bd364c583bb6554ad58cf7",
+            "classification": "introduced",
+            "findingId": "finding-476ea9f087bd364c583bb6554ad58cf7",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-8bbfbeeff8180cbfb4fe9ec5c5d6fc5b",
+            "classification": "introduced",
+            "findingId": "finding-8bbfbeeff8180cbfb4fe9ec5c5d6fc5b",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-4fbccedb5b4a86ba1f866056ed4c3959",
+            "classification": "introduced",
+            "findingId": "finding-4fbccedb5b4a86ba1f866056ed4c3959",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-6fba0f951c51d890e11bb1cc61dc182e",
+            "classification": "introduced",
+            "findingId": "finding-6fba0f951c51d890e11bb1cc61dc182e",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-5d7fbafb2ca0f4ab1e633d64f42bb03a",
+            "classification": "introduced",
+            "findingId": "finding-5d7fbafb2ca0f4ab1e633d64f42bb03a",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-13a234bb2f740cdc57a003ccd2152b5e",
+            "classification": "introduced",
+            "findingId": "finding-13a234bb2f740cdc57a003ccd2152b5e",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "c9feddde063f553b31d28308668dc8101709ece2",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 138240,
+      "output_sha256": "b11acfe084b746ac8604537098d0117b23aeb2485eb84758123285576ef8e807",
+      "reservation_id": "07490c8694204af4ac3be9029e0914c2",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.2",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.2",
+      "timestamp": "2026-08-23T22:34:27.003764Z",
+      "tool_calls": 9,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "17f50de14dfc904cfa38536e40016b52fce2fde0702ca11b74f4b0f6ee2eeb01",
+      "backend": "codex",
+      "base_sha": "3addb61db8b299d510b87fe5cd1bab4f9b57b1c3",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-927f97febd87657586aeffcd3d92851e",
+            "classification": "introduced",
+            "findingId": "finding-927f97febd87657586aeffcd3d92851e",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-311ce5b94aba488981625c8900055871",
+            "classification": "introduced",
+            "findingId": "finding-311ce5b94aba488981625c8900055871",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-476ea9f087bd364c583bb6554ad58cf7",
+            "classification": "introduced",
+            "findingId": "finding-476ea9f087bd364c583bb6554ad58cf7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d49daacfecdcaf3cc8f9a8b11f8eb1e0",
+            "classification": "introduced",
+            "findingId": "finding-d49daacfecdcaf3cc8f9a8b11f8eb1e0",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-8bbfbeeff8180cbfb4fe9ec5c5d6fc5b",
+            "classification": "introduced",
+            "findingId": "finding-8bbfbeeff8180cbfb4fe9ec5c5d6fc5b",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-4fbccedb5b4a86ba1f866056ed4c3959",
+            "classification": "introduced",
+            "findingId": "finding-4fbccedb5b4a86ba1f866056ed4c3959",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-6fba0f951c51d890e11bb1cc61dc182e",
+            "classification": "introduced",
+            "findingId": "finding-6fba0f951c51d890e11bb1cc61dc182e",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-5d7fbafb2ca0f4ab1e633d64f42bb03a",
+            "classification": "introduced",
+            "findingId": "finding-5d7fbafb2ca0f4ab1e633d64f42bb03a",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-13a234bb2f740cdc57a003ccd2152b5e",
+            "classification": "introduced",
+            "findingId": "finding-13a234bb2f740cdc57a003ccd2152b5e",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "ecb2e0016ca58b714527aae6be82f9b0dc048743",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 1983,
+      "output_sha256": "dd7d47a7986cd83a1033e9d65ed2991dd876c33ce8c10d58c3966971a2a463b5",
+      "reservation_id": "4e2486271d4240ddb7aba38a9e9355e4",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.2",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.2",
+      "timestamp": "2026-08-23T22:39:26.336419Z",
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "fcafcc0e82d151f0c3d75c63be008d2919bcb34b2c77345707fa352ca7406296",
+      "backend": "codex",
+      "base_sha": "3addb61db8b299d510b87fe5cd1bab4f9b57b1c3",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-927f97febd87657586aeffcd3d92851e",
+            "classification": "introduced",
+            "findingId": "finding-927f97febd87657586aeffcd3d92851e",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-311ce5b94aba488981625c8900055871",
+            "classification": "introduced",
+            "findingId": "finding-311ce5b94aba488981625c8900055871",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-476ea9f087bd364c583bb6554ad58cf7",
+            "classification": "introduced",
+            "findingId": "finding-476ea9f087bd364c583bb6554ad58cf7",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d49daacfecdcaf3cc8f9a8b11f8eb1e0",
+            "classification": "introduced",
+            "findingId": "finding-d49daacfecdcaf3cc8f9a8b11f8eb1e0",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-8bbfbeeff8180cbfb4fe9ec5c5d6fc5b",
+            "classification": "introduced",
+            "findingId": "finding-8bbfbeeff8180cbfb4fe9ec5c5d6fc5b",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-4fbccedb5b4a86ba1f866056ed4c3959",
+            "classification": "introduced",
+            "findingId": "finding-4fbccedb5b4a86ba1f866056ed4c3959",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-6fba0f951c51d890e11bb1cc61dc182e",
+            "classification": "introduced",
+            "findingId": "finding-6fba0f951c51d890e11bb1cc61dc182e",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-5d7fbafb2ca0f4ab1e633d64f42bb03a",
+            "classification": "introduced",
+            "findingId": "finding-5d7fbafb2ca0f4ab1e633d64f42bb03a",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-13a234bb2f740cdc57a003ccd2152b5e",
+            "classification": "introduced",
+            "findingId": "finding-13a234bb2f740cdc57a003ccd2152b5e",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "267798f4d862e51b0e0f012762b0fd6fe0863b3f",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 734,
+      "output_sha256": "22ed94e2a23e37060c93aac69bd432101dd27260db97dd37196be6de9bf7f4af",
+      "reservation_id": "1a9d8f2e2d0a4e08b5b24c31c5f25226",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.2",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.2",
+      "timestamp": "2026-08-23T22:40:46.140106Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "4439f95491bdfda3b19a5fffd4f57d86dafbeb088a52a3cd04a910305ef2a393",
+      "backend": "codex",
+      "base_sha": "cfc2e2006fc76d9aa5955da5ae4d263a13df0371",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-2a728362ae01202ab61223dd45608214",
+            "classification": "introduced",
+            "findingId": "finding-2a728362ae01202ab61223dd45608214",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-343748875d0ba42f81f829b80979daca",
+            "classification": "introduced",
+            "findingId": "finding-343748875d0ba42f81f829b80979daca",
+            "firstSeenThisRound": true,
+            "severity": "P2",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "46897628cd7876635e9ce2a608160d627313a673",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 122685,
+      "output_sha256": "72728ff5e7f24ac66847caa94f215bbc7ab2d734d2de7151bcc87270135647d0",
+      "reservation_id": "8971453b858043f79162dd889acf8ab4",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.3",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.3",
+      "timestamp": "2026-08-23T22:56:06.918987Z",
+      "tool_calls": 8,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "e09641c0eabfa24e1b808d3b92e734d35c6d611f902174d0854ed004541e13c7",
+      "backend": "codex",
+      "base_sha": "cfc2e2006fc76d9aa5955da5ae4d263a13df0371",
+      "counter_kind": "impl",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-2a728362ae01202ab61223dd45608214",
+            "classification": "introduced",
+            "findingId": "finding-2a728362ae01202ab61223dd45608214",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-343748875d0ba42f81f829b80979daca",
+            "classification": "introduced",
+            "findingId": "finding-343748875d0ba42f81f829b80979daca",
+            "firstSeenThisRound": false,
+            "severity": "P2",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "implementation"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "191f5e669e5a78b8751f715935f3603eb091e914",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 827,
+      "output_sha256": "71b1adccada7bb5ccb7dfb03640af5477bb208d8431d57df98de1f8c27210a55",
+      "reservation_id": "6fff6301230e4a5b94f8b041dd610c2f",
+      "round_consumed": true,
+      "scope": "impl:fn-1-grok-bot-factory.3",
+      "superseded_by": null,
+      "task": "fn-1-grok-bot-factory.3",
+      "timestamp": "2026-08-23T22:59:25.869380Z",
+      "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "0ca41d08b5391c4a1055b7124ccfe2d8cdc4c859956d57791bf559c871bffda9",
+      "backend": "codex",
+      "base_sha": "04f9480049bcabdf4d2def678439e4f37bb3cc21",
+      "counter_kind": "plan",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c15748b6aea7099a4dfc2454ed83b1de",
+            "classification": "introduced",
+            "findingId": "finding-c15748b6aea7099a4dfc2454ed83b1de",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-e6168a66d42cb178f6f40ea79e488190",
+            "classification": "introduced",
+            "findingId": "finding-e6168a66d42cb178f6f40ea79e488190",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-d2bc25e3af04c575131459c0e48f8f13",
+            "classification": "pre_existing",
+            "findingId": "finding-d2bc25e3af04c575131459c0e48f8f13",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          },
+          {
+            "chainRoot": "finding-8ee616367ccb92cde1ae1afce579e24c",
+            "classification": "introduced",
+            "findingId": "finding-8ee616367ccb92cde1ae1afce579e24c",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "366d12a6f854417443b825223b48b5f7a8d205ce",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 235066,
+      "output_sha256": "1764cec06c8678569309c55243de43063c9401e4e42c36393dcab176ee07ac27",
+      "reservation_id": "4477b982eb3b456189c8d9b55fbdf35c",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-08-23T23:10:35.172211Z",
+      "tool_calls": 11,
+      "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "179d118580f7731048a0261d3654d8e6682d408c5f0532a6ed4d0617784c14c4",
+      "backend": "codex",
+      "base_sha": "04f9480049bcabdf4d2def678439e4f37bb3cc21",
+      "counter_kind": "plan",
+      "effort": "high",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "codex",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-c15748b6aea7099a4dfc2454ed83b1de",
+            "classification": "introduced",
+            "findingId": "finding-c15748b6aea7099a4dfc2454ed83b1de",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-e6168a66d42cb178f6f40ea79e488190",
+            "classification": "introduced",
+            "findingId": "finding-e6168a66d42cb178f6f40ea79e488190",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-d2bc25e3af04c575131459c0e48f8f13",
+            "classification": "pre_existing",
+            "findingId": "finding-d2bc25e3af04c575131459c0e48f8f13",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-8ee616367ccb92cde1ae1afce579e24c",
+            "classification": "introduced",
+            "findingId": "finding-8ee616367ccb92cde1ae1afce579e24c",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "871b8be8a80711f08aa032d72f2b81cf36b19c7c",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-5.6-sol",
+      "outcome": "verdict",
+      "output_bytes": 3628,
+      "output_sha256": "e56ffedb35e041d225dcb99c867f6e5032261f7a2cbfc118273358bc5a35164f",
+      "reservation_id": "7cad41c2cd24434aaf795cf71e70dd7c",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-08-23T23:13:20.732227Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
+    "impl:fn-1-grok-bot-factory.1": 1,
+    "impl:fn-1-grok-bot-factory.2": 1,
+    "impl:fn-1-grok-bot-factory.3": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
-  "review_pending_rounds": {},
-  "review_reservations": {},
+  "review_pending_rounds": {
+    "impl:fn-1-grok-bot-factory.1": 1
+  },
+  "review_reservations": {
+    "cb40f69cc0e64edcb656c968b6d5fc8d": {
+      "artifact_sha256": null,
+      "counter_scope": "impl:fn-1-grok-bot-factory.1",
+      "epoch": 0,
+      "forced": false,
+      "review_type": "impl",
+      "superseded_by": "8ccf1f59b1ec47f9a0070f7ab55ae0bd",
+      "superseded_epoch": 1
+    }
+  },
   "review_transport_failures": {
+    "completion": 0,
+    "impl:fn-1-grok-bot-factory.1": 0,
+    "impl:fn-1-grok-bot-factory.2": 0,
+    "impl:fn-1-grok-bot-factory.3": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/fn-1-grok-bot-factory.md",
@@ -384,5 +1172,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-23T21:33:37.731918Z"
+  "updated_at": "2026-08-23T23:13:20.737172Z"
 }

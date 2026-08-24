@@ -45,9 +45,12 @@ Stuck/owner-gated notify (builder → main → human), builder-owns-routine cont
 - [ ] No live routine or webhook is created as a side effect of this task
 
 ## Done summary
-TBD
+Notify helper maps gate/runner exit 20 to NEEDS_HUMAN (403 and missing host/pin covered), fires only the R10 set, and ships the builder command-first contract plus README/CHANGELOG/secrets guard.
 
+baseline: green via receipt (GATE_SKIPPED:unittest:green-receipt 267798f4 - baseline reused from prior post-gate pass)
+stage: impl-review - ran [2026-08-23T22:56:06Z NEEDS_WORK .. 2026-08-23 SHIP]
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 46897628cd7876635e9ce2a608160d627313a673, 191f5e669e5a78b8751f715935f3603eb091e914
+- Tests: tests/factory/gate.test.sh, tests/factory/notify.test.sh, tests/factory/secrets.test.sh
 - PRs:

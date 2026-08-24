@@ -23,6 +23,8 @@ Notify only when stuck or owner-gated. Else quiet. [user]
 
 Ship a small deterministic **gate** plus a **tick runner** as code in this repo. The gate is a program (not a model, not a prompt).
 
+The factory program is **TypeScript on Bun**, not bash and not Python. [user] The gate stays an exec-able program the webhook can run (`bun` / shebang). Fail-closed exits stay `0` quiet, `10` start, `20` stuck.
+
 **Pre-model execution is a prerequisite (R3, R5).** The wake must run the gate program with zero model tokens and use its exit code. There is no model-first fallback. If a Grok Bot webhook routine cannot exec a command before any model, stop and rethink the wake — do not implement “start a model whose first tool is the gate.” A non-production proof (fixture + documented routine-first-command) is part of the early proof; implementing the quiet path as a model call fails R3/R5.
 
 **Fire path vs discovery path (do not conflate):**
@@ -56,7 +58,7 @@ Exit contract (signature): quiet `0` only when a quiet case is **positively esta
 
 Split the “setup pin” (R13) from the host binary (R14):
 - **Review pin** = the product checkout’s `.flow/config.json` `review.backend` and instruction-file routing block. Documented backends only. Do not overwrite. Unfulfillable review pin → stuck.
-- **Host CLI** = instance input (flag/env): an executable from the documented host set that actually provides `/loop` or `/goal` (land uses `/flow-next:land`). Default = a CLI already on the builder machine. Do **not** infer the host from `review.backend`. If that CLI is missing or cannot provide `/loop`/`/goal`, stuck — no substitute guess. Cloud Agents only if that instance CLI cannot run. Grok Build has no `/loop`/`/goal`; choosing it as the host CLI is unfulfillable (stuck), not a license to invent a Grok-native loop.
+- **Host CLI** = instance input (flag/env): an executable from the documented host set that actually provides `/loop` or `/goal` (land uses `/flow-next:land`). Default = a CLI already on the builder machine. Do **not** infer the host from `review.backend`. If that CLI is missing or cannot provide `/loop`/`/goal`, stuck — no substitute guess. Cloud Agents only if that instance CLI cannot run. Grok Build is a valid host. It has /loop and /goal. /loop is a recurring interval that wakes the agent, same idea as Claude Code.
 
 Worktree allocation is atomic (unique directory per tick), contained under a factory worktree root (`realpath`; refuse symlinks that escape). If ticks share a clone’s git dir, take a narrow per-repo lock around `worktree add`/`remove` only — not a factory-wide one-tick mutex. Do not force-remove dirty trees.
 
@@ -82,6 +84,8 @@ Rejected as overkill: factory HTTP listener; factory HMAC; clone-then-`flowctl` 
 
 ## Architecture & Data Models
 <!-- scope: technical -->
+
+The factory program is TypeScript on Bun (not bash, not Python). [user] The webhook still execs the gate as a program (`bun factory/gate.ts` or the file shebang) with the same fail-closed exits.
 
 Wake: GitHub repo webhook, **push** only, POSTs to a Grok Bot routine `{ "type": "webhook" }`. [user]
 
@@ -137,7 +141,7 @@ Secrets, routine URL, sender key: not in git. [user]
 # Fixture gate: GitHub push, nothing ready → quiet (exit 0), no gh fleet-scan.
 # Implementer lands the concrete invocation in factory tests; this is the smoke.
 # Do not POST to a live GitHub hook or a live Grok Bot routine.
-tests/factory/gate.test.sh
+bun test
 ```
 
 ## Boundaries
@@ -206,7 +210,7 @@ The factory has to run without an installer so fn-2 can be built by it. [user]
 
 ## Early proof point
 
-Task fn-1-grok-bot-factory.1 proves the quiet path: fixture GitHub push JSON in, no clone of other repos, exit 0 when nothing is ready, and the gate is a program (zero model tokens). If that fails, do not build the tick runner. If a Grok Bot routine cannot invoke that program before any model, rethink the wake before fn-1.2.
+Task fn-1-grok-bot-factory.1 proves the quiet path: fixture GitHub push JSON in, no clone of other repos, exit 0 when nothing is ready, and the gate is an exec-able TypeScript program on Bun (zero model tokens). Prove with `bun test`. If that fails, do not build the tick runner. If a Grok Bot routine cannot invoke that program before any model, rethink the wake before fn-1.2.
 
 ## Requirement coverage
 
