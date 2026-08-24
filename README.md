@@ -22,9 +22,9 @@ The factory is any repo you push to. Not a named-repo allowlist.
    - Events: **push** only
 3. That is a GitHub repo hook POSTing to a Grok Bot routine. Do not build a factory HTTP listener as the wake.
 
-The routine’s **first action** is exec of `factory/gate.sh` on the delivered GitHub push body — no model. If the routine panel cannot exec a command before a model, stop (do not start a model to run the gate).
+The factory program is TypeScript on Bun. The routine’s **first action** is exec of `factory/gate.ts` on the delivered GitHub push body — no model (`bun factory/gate.ts`, or the file shebang). If the routine panel cannot exec a command before a model, stop (do not start a model to run the gate).
 
-On fire: if the gate is quiet, stay quiet. If it starts, the builder runs `factory/tick.sh` on an isolated worktree via the instance host CLI. Stay quiet unless a human decision is needed.
+On fire: if the gate is quiet, stay quiet. If it starts, the builder runs `factory/tick.ts` on an isolated worktree via the instance host CLI. Stay quiet unless a human decision is needed.
 
 ## Add a repo
 
@@ -32,10 +32,10 @@ Add the same GitHub webhook on the new `owner/name`, same routine URL. Do not fr
 
 ## On fire (supervisor)
 
-1. Exec `factory/gate.sh` on the push body. No model.
+1. Exec `factory/gate.ts` on the push body. No model.
 2. If none ready (exit 0): stop. No status ping.
 3. If stuck (exit 20): notify `NEEDS_HUMAN` (builder → main → human). Preserve the reason.
-4. If start (exit 10): new isolated worktree, run `factory/tick.sh` via the instance host CLI (flag/env; default = a documented host already on this machine). Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin. Do not infer the host from `review.backend`.
+4. If start (exit 10): new isolated worktree, run `factory/tick.ts` via the instance host CLI (flag/env; default = a documented host already on this machine). Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin. Do not infer the host from `review.backend`.
 5. Cloud Agents only if that instance host CLI cannot run.
 
 `/flow-next:pilot` is one tick. `/loop` or `/goal` calls it each tick until `NO_WORK`, `NEEDS_HUMAN`, or `DEFERRED_TO_LAND`.
@@ -57,6 +57,12 @@ Cursor GitHub *listeners* have no raw git-push event (PR opened/pushed/merged on
 ## Do not put in git
 
 Routine URL, sender key, tokens, PATs, sessions, and vault paths. Those stay in the Grok Bot routine panel, GitHub webhook settings, and the instance vault — not this repo.
+
+## Tests
+
+```bash
+bun test
+```
 
 ## Do not arm from this README
 

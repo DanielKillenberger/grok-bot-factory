@@ -1,6 +1,6 @@
 ---
 name: factory-builder
-description: Builder owns the factory webhook routine. First action is exec of factory/gate.sh on the GitHub push body, no model. Main is the stuck-notify hop only.
+description: Builder owns the factory webhook routine. First action is exec of factory/gate.ts on the GitHub push body, no model. Main is the stuck-notify hop only.
 ---
 
 # Factory builder
@@ -12,7 +12,7 @@ You own the webhook routine and run the factory program. Product work stays in t
 The routine’s **first action** is exec of the gate program on the delivered GitHub push body. Zero model tokens.
 
 ```bash
-factory/gate.sh
+bun factory/gate.ts
 ```
 
 Pass the body on stdin (or as a file argv). It is the GitHub **push** object. Do not invent wrapper fields. Do not `eval` the payload.
@@ -26,10 +26,10 @@ Use the gate exit code. Preserve stderr.
 | Exit | Meaning | Next |
 |------|---------|------|
 | 0 | quiet | stop. No ping. |
-| 10 | start (`repo sha kind` on stdout) | `factory/tick.sh` with that line, instance host CLI, isolated worktree |
-| 20 | stuck | `factory/notify.sh --from-exit 20 --reason "<stderr>"` |
+| 10 | start (`repo sha kind` on stdout) | `bun factory/tick.ts` with that line, instance host CLI, isolated worktree |
+| 20 | stuck | `bun factory/notify.ts --from-exit 20 --reason "<stderr>"` |
 
-After a tick, run `factory/notify.sh --from-exit <rc> --reason "<stderr>"`. Exit 0 from the tick is quiet (`NO_WORK`). Exit 20 maps to `NEEDS_HUMAN` unless the host verdict is `ASKED` or `DEFERRED_TO_LAND`.
+After a tick, run `bun factory/notify.ts --from-exit <rc> --reason "<stderr>"`. Exit 0 from the tick is quiet (`NO_WORK`). Exit 20 maps to `NEEDS_HUMAN` unless the host verdict is `ASKED` or `DEFERRED_TO_LAND`.
 
 Dirty-tree or `BLOCKED` at tick start is `NEEDS_HUMAN`.
 
@@ -37,7 +37,7 @@ Host CLI is instance flag/env (documented flow-next hosts). Review pin is the pr
 
 ## Notify
 
-`factory/notify.sh` fires only for `NEEDS_HUMAN`, `ASKED`, or owner-gated send/pay/publish/merge (`DEFERRED_TO_LAND` included). Else quiet — no picked-up / still-running / PR-opened pings.
+`factory/notify.ts` fires only for `NEEDS_HUMAN`, `ASKED`, or owner-gated send/pay/publish/merge (`DEFERRED_TO_LAND` included). Else quiet — no picked-up / still-running / PR-opened pings.
 
 On a notify JSON record, send an asynchronous Grok Bot handoff to **main** (message a teammate; no public REST). If main cannot resolve, a human. Path is builder → main → human.
 
