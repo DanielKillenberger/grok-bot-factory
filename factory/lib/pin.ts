@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { basename } from "node:path";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { isExecutable, runCmd, which, whichOnPath } from "./cmd.ts";
 
 export const HOST_INVENTORY = [
@@ -220,10 +220,203 @@ function shQuote(value: string): string {
   return "'" + value.replaceAll("'", "'\\''") + "'";
 }
 
+/** Tick home is dirname(tree); grok's script(1) typescript lives there. */
+export function hostTypescriptPath(tree: string): string {
+  return join(dirname(tree), "host.typescript");
+}
+
+function extractVerdictLine(text: string): string | undefined {
+  for (const raw of text.split(/\r\n|\n|\r/)) {
+    const trimmed = raw.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").trim();
+    const idx = trimmed.search(/(?:PILOT|LAND)_VERDICT=/);
+    if (idx >= 0) return trimmed.slice(idx);
+  }
+  return undefined;
+}
+
+function hostEnv(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined) out[k] = v;
+  }
+  out.FACTORY_CLAIM_POLICY = "skip-foreign";
+  return out;
+}
+
+function readChildPids(pid: number): number[] {
+  const out: number[] = [];
+  let tasks: string[] = [];
+  try {
+    tasks = readdirSync(`/proc/${pid}/task`);
+  } catch {
+    return out;
+  }
+  for (const t of tasks) {
+    try {
+      const text = readFileSync(`/proc/${pid}/task/${t}/children`, "utf8");
+      for (const p of text.trim().split(/\s+/)) {
+        const n = Number(p);
+        if (Number.isInteger(n) && n > 1) out.push(n);
+      }
+    } catch {
+      // process already gone
+    }
+  }
+  return out;
+}
+
+function readPgid(pid: number): number | undefined {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const close = stat.lastIndexOf(")");
+    if (close < 0) return undefined;
+    const rest = stat.slice(close + 2).split(" ");
+    const pgid = Number(rest[2]);
+    return Number.isInteger(pgid) && pgid > 1 ? pgid : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function signalProcessTree(root: number, signal: "SIGTERM" | "SIGKILL"): void {
+  const pids = new Set<number>();
+  const stack = [root];
+  while (stack.length) {
+    const pid = stack.pop()!;
+    if (pids.has(pid)) continue;
+    pids.add(pid);
+    for (const c of readChildPids(pid)) stack.push(c);
+  }
+  const mine = readPgid(process.pid) ?? process.pid;
+  const pgids = new Set<number>();
+  for (const pid of pids) {
+    const g = readPgid(pid);
+    if (g !== undefined && g !== mine) pgids.add(g);
+  }
+  for (const g of pgids) {
+    try {
+      process.kill(-g, signal);
+    } catch {
+      // already gone
+    }
+  }
+  for (const pid of pids) {
+    if (pid === process.pid) continue;
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // already gone
+    }
+  }
+}
+
+async function pumpStream(
+  stream: ReadableStream<Uint8Array>,
+  chunks: string[],
+  onChunk: () => void,
+): Promise<void> {
+  const reader = stream.getReader();
+  const dec = new TextDecoder();
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    chunks.push(dec.decode(value, { stream: true }));
+    onChunk();
+  }
+}
+
+async function runGrokHost(
+  argv: readonly string[],
+  opts: { cwd: string; typescript: string; timeoutMs: number },
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  writeFileSync(opts.typescript, "");
+  const proc = Bun.spawn([...argv], {
+    cwd: opts.cwd,
+    env: hostEnv(),
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    // Own process group so we can SIGTERM/SIGKILL script+grok without this process.
+    detached: true,
+  });
+  const stdoutChunks: string[] = [];
+  const stderrChunks: string[] = [];
+  let verdict: string | undefined;
+  let stoppedForVerdict = false;
+  let grace: ReturnType<typeof setTimeout> | undefined;
+
+  const killTree = (signal: "SIGTERM" | "SIGKILL") => {
+    if (proc.pid !== undefined) signalProcessTree(proc.pid, signal);
+    try {
+      proc.kill(signal);
+    } catch {
+      // already exited
+    }
+  };
+
+  const stillRunning = (): boolean => proc.exitCode == null;
+
+  const consider = () => {
+    if (verdict) return;
+    let tsText = "";
+    try {
+      tsText = readFileSync(opts.typescript, "utf8");
+    } catch {
+      tsText = "";
+    }
+    const found =
+      extractVerdictLine(stdoutChunks.join("")) ?? extractVerdictLine(tsText);
+    if (!found) return;
+    verdict = found;
+    // A host that prints a verdict and exits (including nonzero) must keep that
+    // exit code. Only SIGTERM if it is still running — the live grok hang.
+    if (!stillRunning()) return;
+    grace = setTimeout(() => {
+      if (!stillRunning()) return;
+      stoppedForVerdict = true;
+      killTree("SIGTERM");
+    }, 250);
+  };
+
+  const timer = setTimeout(() => {
+    killTree("SIGKILL");
+  }, opts.timeoutMs);
+  const poll = setInterval(consider, 50);
+
+  try {
+    await Promise.all([
+      pumpStream(proc.stdout, stdoutChunks, consider),
+      pumpStream(proc.stderr, stderrChunks, () => {}),
+      proc.exited,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    clearInterval(poll);
+    if (grace) clearTimeout(grace);
+  }
+  consider();
+
+  const stdout = stdoutChunks.join("");
+  const stderr = stderrChunks.join("");
+  let tsText = "";
+  try {
+    tsText = readFileSync(opts.typescript, "utf8");
+  } catch {
+    tsText = "";
+  }
+
+  if (stoppedForVerdict && verdict) {
+    return { code: 0, stdout: `${verdict}\n`, stderr };
+  }
+  const captured = stdout.length > 0 ? stdout : tsText;
+  return { code: proc.exitCode ?? 1, stdout: captured, stderr };
+}
+
 export function hostArgv(
   host: string,
   drive: HostDrive,
   skill: string,
+  typescript?: string,
 ): string[] | { error: string } {
   // Grok Build slash commands are one prompt string. Claude-shaped hosts take
   // split argv (`/loop` `10m` <skill> or `/goal` <skill>).
@@ -231,11 +424,13 @@ export function hostArgv(
     // grok 1.0.5 opens /dev/tty and exits ENXIO without a PTY. script(1) gives
     // one. --always-approve so a factory tick cannot block on a permission
     // prompt. Missing script(1) is stuck — never drop to no-TTY grok.
+    // -f flushes the typescript so a hanging grok still surfaces PILOT/LAND_VERDICT.
     const scriptBin = whichOnPath("script");
     if (!scriptBin) return { error: "script(1) missing; grok needs a PTY" };
+    if (!typescript) return { error: "missing host typescript path" };
     const prompt = drive === "loop" ? `/loop 10m ${skill}` : `/goal ${skill}`;
     const cmd = `${shQuote(host)} --always-approve --no-alt-screen ${shQuote(prompt)}`;
-    return [scriptBin, "-q", "-e", "-c", cmd, "/dev/null"];
+    return [scriptBin, "-q", "-e", "-f", "-c", cmd, typescript];
   }
   return drive === "loop" ? [host, "/loop", "10m", skill] : [host, "/goal", skill];
 }
@@ -247,12 +442,17 @@ export async function hostRun(
   tree: string,
 ): Promise<{ code: number; stdout: string; stderr: string } | { error: string }> {
   const skill = kind === "land" ? "/flow-next:land" : "/flow-next:pilot";
-  const argv = hostArgv(host, drive, skill);
+  const typescript = hostBasename(host) === "grok" ? hostTypescriptPath(tree) : undefined;
+  const argv = hostArgv(host, drive, skill, typescript);
   if (!Array.isArray(argv)) return argv;
+  const timeoutMs = Number(process.env.FACTORY_HOST_TIMEOUT_MS ?? 3_600_000);
   // Host ticks can run for a long time; do not apply the gh/git command deadline.
+  if (typescript) {
+    return runGrokHost(argv, { cwd: tree, typescript, timeoutMs });
+  }
   return runCmd(argv, {
     cwd: tree,
     env: { FACTORY_CLAIM_POLICY: "skip-foreign" },
-    timeoutMs: Number(process.env.FACTORY_HOST_TIMEOUT_MS ?? 3_600_000),
+    timeoutMs,
   });
 }

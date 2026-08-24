@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { whichOnPath } from "../../factory/lib/cmd.ts";
 import {
   hostArgv,
   hostProbe,
   hostRun,
+  hostTypescriptPath,
   reviewPinValidate,
   routingBlockRead,
   routingBlockValidate,
@@ -210,8 +211,13 @@ function expectOkRun(
   return ran;
 }
 
-function expectGrokScriptArgv(host: string, drive: "loop" | "goal", skill: string): string[] {
-  const built = hostArgv(host, drive, skill);
+function expectGrokScriptArgv(
+  host: string,
+  drive: "loop" | "goal",
+  skill: string,
+  typescript: string,
+): string[] {
+  const built = hostArgv(host, drive, skill, typescript);
   expect(Array.isArray(built), Array.isArray(built) ? "" : built.error).toBe(true);
   if (!Array.isArray(built)) throw new Error(built.error);
   const scriptBin = whichOnPath("script");
@@ -221,41 +227,53 @@ function expectGrokScriptArgv(host: string, drive: "loop" | "goal", skill: strin
     scriptBin as string,
     "-q",
     "-e",
+    "-f",
     "-c",
     `'${host}' --always-approve --no-alt-screen '${prompt}'`,
-    "/dev/null",
+    typescript,
   ]);
   return built;
 }
 
+function makeTree(): string {
+  const tree = join(checkout, "tree");
+  mkdirSync(tree, { recursive: true });
+  return tree;
+}
+
 test("hostRun grok loop is script PTY + one prompt", async () => {
   const grok = join(checkout, "grok");
+  const tree = makeTree();
   const argvLog = join(checkout, "argv.jsonl");
   writeArgvHost(grok, argvLog);
-  expectGrokScriptArgv(grok, "loop", "/flow-next:pilot");
-  const ran = expectOkRun(await hostRun(grok, "loop", "pilot", checkout));
+  expectGrokScriptArgv(grok, "loop", "/flow-next:pilot", hostTypescriptPath(tree));
+  const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
   expect(ran.code).toBe(0);
   const argv = JSON.parse(readFileSync(argvLog, "utf8").trim()) as string[];
   expect(argv).toEqual(["--always-approve", "--no-alt-screen", "/loop 10m /flow-next:pilot"]);
   expect(argv.join(" ")).toContain("/loop");
+  expect(existsSync(hostTypescriptPath(tree))).toBe(true);
 });
 
 test("hostRun grok goal is script PTY + one prompt", async () => {
   const grok = join(checkout, "grok");
+  const tree = makeTree();
   const argvLog = join(checkout, "argv.jsonl");
   writeArgvHost(grok, argvLog);
-  expectGrokScriptArgv(grok, "goal", "/flow-next:land");
-  const ran = expectOkRun(await hostRun(grok, "goal", "land", checkout));
+  expectGrokScriptArgv(grok, "goal", "/flow-next:land", hostTypescriptPath(tree));
+  const ran = expectOkRun(await hostRun(grok, "goal", "land", tree));
   expect(ran.code).toBe(0);
   expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual([
     "--always-approve",
     "--no-alt-screen",
     "/goal /flow-next:land",
   ]);
+  expect(existsSync(hostTypescriptPath(tree))).toBe(true);
 });
 
 test("hostRun generic inventory host keeps split argv", async () => {
   const claude = join(checkout, "claude");
+  const tree = makeTree();
   const argvLog = join(checkout, "argv.jsonl");
   writeArgvHost(claude, argvLog);
   expect(hostArgv(claude, "loop", "/flow-next:pilot")).toEqual([
@@ -264,14 +282,48 @@ test("hostRun generic inventory host keeps split argv", async () => {
     "10m",
     "/flow-next:pilot",
   ]);
-  const ran = expectOkRun(await hostRun(claude, "loop", "pilot", checkout));
+  const ran = expectOkRun(await hostRun(claude, "loop", "pilot", tree));
   expect(ran.code).toBe(0);
   expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual([
     "/loop",
     "10m",
     "/flow-next:pilot",
   ]);
+  expect(existsSync(hostTypescriptPath(tree))).toBe(false);
 });
+
+test("hostRun stops a hanging grok after the first PILOT_VERDICT line", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "hanging.pid");
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > "${marker}"
+echo 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="hang-stub"'
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    expect(Date.now() - t0).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const line = ran.stdout.split(/\r?\n/).find((l) => l.startsWith("PILOT_VERDICT="));
+    expect(line).toBe('PILOT_VERDICT=NO_WORK spec=- stage=- reason="hang-stub"');
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
 
 
 

@@ -153,16 +153,18 @@ test("grok host without /loop in help still probes as loop", async () => {
   const grok = join(bin, "grok");
   const run = invokes.find((a) => a.some((arg) => arg.includes("/loop")));
   expect(run).toEqual(["--always-approve", "--no-alt-screen", "/loop 10m /flow-next:pilot"]);
-  const wrapped = hostArgv(grok, "loop", "/flow-next:pilot");
+  const typescript = join(tmp, "host.typescript");
+  const wrapped = hostArgv(grok, "loop", "/flow-next:pilot", typescript);
   expect(Array.isArray(wrapped)).toBe(true);
   if (Array.isArray(wrapped)) {
     expect(wrapped).toEqual([
       whichOnPath("script") as string,
       "-q",
       "-e",
+      "-f",
       "-c",
       `'${grok}' --always-approve --no-alt-screen '/loop 10m /flow-next:pilot'`,
-      "/dev/null",
+      typescript,
     ]);
   }
 });
