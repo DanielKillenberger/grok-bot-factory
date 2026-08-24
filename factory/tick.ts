@@ -115,6 +115,14 @@ async function parseStart(
   stuck("missing gate start output");
 }
 
+function hostExitReason(code: number, stderr: string): string {
+  const line = stderr
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  return line ? `host exited ${code}: ${line}` : `host exited ${code}`;
+}
+
 export async function runTick(argv: string[]): Promise<void> {
   const { flags, rest } = parseArgs(argv, ALLOWED);
   if (flags.has("host")) process.env.FACTORY_HOST = flags.get("host");
@@ -207,7 +215,7 @@ export async function runTick(argv: string[]): Promise<void> {
       } catch {
         // ignore
       }
-      stuck(`host exited ${ran.code}`);
+      stuck(hostExitReason(ran.code, ran.stderr));
     }
 
     const verdictRe = tick.kind === "land" ? /^LAND_VERDICT=/ : /^PILOT_VERDICT=/;

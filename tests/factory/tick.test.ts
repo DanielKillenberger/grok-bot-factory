@@ -54,6 +54,7 @@ function baseEnv(extra: Record<string, string | undefined> = {}) {
     FACTORY_HOST_SLEEP: undefined,
     FACTORY_HOST_EXIT: undefined,
     FACTORY_HOST_MUTATE: undefined,
+    FACTORY_HOST_ARGV_LOG: undefined,
     ...extra,
   };
 }
@@ -136,9 +137,45 @@ test("host without /loop or /goal", async () => {
 });
 
 test("grok host without /loop in help still probes as loop", async () => {
-  const res = await runTick(tickArgs(), { FACTORY_HOST_HELP: "none" });
+  const argvLog = join(tmp, "argv.jsonl");
+  const res = await runTick(tickArgs(), {
+    FACTORY_HOST_HELP: "none",
+    FACTORY_HOST_ARGV_LOG: argvLog,
+  });
   expect(res.code, res.stderr).toBe(0);
   expect(readFileSync(hostLog, "utf8")).toContain("/loop");
+  const invokes = readFileSync(argvLog, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as string[]);
+  const run = invokes.find((a) => a.some((arg) => arg.includes("/loop")));
+  expect(run).toEqual(["/loop 10m /flow-next:pilot"]);
+});
+
+test("generic fake host keeps Claude-shaped split /loop argv", async () => {
+  linkStub(bin, "claude", STUB_HOST);
+  const argvLog = join(tmp, "argv.jsonl");
+  const res = await runTick(
+    [
+      "--host",
+      join(bin, "claude"),
+      "--worktree-root",
+      wt,
+      "--clone-url",
+      product,
+      "acme/app",
+      sha,
+      "pilot",
+    ],
+    { FACTORY_HOST_HELP: "loop", FACTORY_HOST_ARGV_LOG: argvLog },
+  );
+  expect(res.code, res.stderr).toBe(0);
+  const invokes = readFileSync(argvLog, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as string[]);
+  const run = invokes.find((a) => a.includes("/loop"));
+  expect(run).toEqual(["/loop", "10m", "/flow-next:pilot"]);
 });
 
 test("unfulfillable review pin (unknown backend)", async () => {
@@ -486,6 +523,8 @@ test("symlink-escape logs refused", async () => {
 test("host nonzero is stuck", async () => {
   const res = await runTick(tickArgs(), { FACTORY_HOST_EXIT: "1" });
   expect(res.code).toBe(20);
+  expect(res.stderr).toContain("host exited 1");
+  expect(res.stderr).toContain("also mentions NO_WORK in stderr");
 });
 
 test("deleted review pin is stuck", async () => {

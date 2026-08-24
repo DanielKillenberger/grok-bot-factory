@@ -9,4 +9,6 @@
 ### Changed
 
 - `hostProbe` treats an inventory `grok` binary as a loop host even when `grok --help` omits `/loop` and `/goal` (Grok Build slash commands). Other inventory hosts still scan `--help`.
+- `hostRun` invokes basename `grok` with one prompt (`/loop 10m <skill>` or `/goal <skill>`). Other inventory hosts keep Claude-shaped split argv.
+- Tick stuck reasons for a nonzero host exit include the host's first trimmed stderr line.
 - Factory program is TypeScript on Bun (not bash). Gate, tick, and notify stay exec-able (`bun` / shebang) with the same fail-closed exits (0 quiet, 10 start, 20 stuck). Proof command is `bun test`.

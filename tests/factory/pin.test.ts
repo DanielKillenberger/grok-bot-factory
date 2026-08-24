@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   hostProbe,
+  hostRun,
   reviewPinValidate,
   routingBlockRead,
   routingBlockValidate,
@@ -185,4 +186,49 @@ test("unexecutable grok still fails probe", async () => {
   const result = await hostProbe(grok);
   expect("error" in result).toBe(true);
   if ("error" in result) expect(result.error).toMatch(/missing/);
+});
+
+function writeArgvHost(path: string, argvLog: string): void {
+  writeFileSync(
+    path,
+    `#!/usr/bin/env bun
+import { appendFileSync } from "node:fs";
+appendFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)) + "\\n");
+process.exit(0);
+`,
+    { mode: 0o755 },
+  );
+}
+
+test("hostRun grok loop is one prompt containing /loop", async () => {
+  const grok = join(checkout, "grok");
+  const argvLog = join(checkout, "argv.jsonl");
+  writeArgvHost(grok, argvLog);
+  const ran = await hostRun(grok, "loop", "pilot", checkout);
+  expect(ran.code).toBe(0);
+  const argv = JSON.parse(readFileSync(argvLog, "utf8").trim()) as string[];
+  expect(argv).toEqual(["/loop 10m /flow-next:pilot"]);
+  expect(argv.join(" ")).toContain("/loop");
+});
+
+test("hostRun grok goal is one prompt", async () => {
+  const grok = join(checkout, "grok");
+  const argvLog = join(checkout, "argv.jsonl");
+  writeArgvHost(grok, argvLog);
+  const ran = await hostRun(grok, "goal", "land", checkout);
+  expect(ran.code).toBe(0);
+  expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual(["/goal /flow-next:land"]);
+});
+
+test("hostRun generic inventory host keeps split argv", async () => {
+  const claude = join(checkout, "claude");
+  const argvLog = join(checkout, "argv.jsonl");
+  writeArgvHost(claude, argvLog);
+  const ran = await hostRun(claude, "loop", "pilot", checkout);
+  expect(ran.code).toBe(0);
+  expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual([
+    "/loop",
+    "10m",
+    "/flow-next:pilot",
+  ]);
 });

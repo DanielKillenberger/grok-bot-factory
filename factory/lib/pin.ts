@@ -216,6 +216,15 @@ export function routingBlockValidate(
   return { ok: true };
 }
 
+function hostArgv(host: string, drive: HostDrive, skill: string): string[] {
+  // Grok Build slash commands are one prompt string. Claude-shaped hosts take
+  // split argv (`/loop` `10m` <skill> or `/goal` <skill>).
+  if (hostBasename(host) === "grok") {
+    return drive === "loop" ? [host, `/loop 10m ${skill}`] : [host, `/goal ${skill}`];
+  }
+  return drive === "loop" ? [host, "/loop", "10m", skill] : [host, "/goal", skill];
+}
+
 export async function hostRun(
   host: string,
   drive: HostDrive,
@@ -223,8 +232,7 @@ export async function hostRun(
   tree: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const skill = kind === "land" ? "/flow-next:land" : "/flow-next:pilot";
-  const argv =
-    drive === "loop" ? [host, "/loop", "10m", skill] : [host, "/goal", skill];
+  const argv = hostArgv(host, drive, skill);
   // Host ticks can run for a long time; do not apply the gh/git command deadline.
   return runCmd(argv, {
     cwd: tree,
