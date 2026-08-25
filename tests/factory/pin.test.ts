@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSyn
 import { join } from "node:path";
 import { whichOnPath } from "../../factory/lib/cmd.ts";
 import {
+  extractSessionVerdictLine,
   grokSessionsDir,
   hostArgv,
   hostProbe,
@@ -360,6 +361,7 @@ test("hostRun stops a hanging grok after PILOT_VERDICT in session chat_history.j
   process.env.HOME = fakeHome;
   const sessionFile = join(grokSessionsDir(tree), "sess-test", "chat_history.jsonl");
   const line = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="session-stub"';
+  const rec = JSON.stringify({ type: "assistant", content: line });
   writeFileSync(
     grok,
     `#!/bin/sh
@@ -367,7 +369,7 @@ echo $$ > ${JSON.stringify(marker)}
 mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-test"))}
 cat > ${JSON.stringify(sessionFile)} << 'EOF'
 {"type":"assistant","content":"no verdict in this json field"}
-${line}
+${rec}
 EOF
 sleep 120
 `,
@@ -430,14 +432,16 @@ test("hostRun ignores PILOT_VERDICT template in session logs and accepts a real 
   const sessionFile = join(grokSessionsDir(tree), "sess-tmpl", "chat_history.jsonl");
   const template = "PILOT_VERDICT=<ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN>";
   const real = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="no ready spec with satisfied deps"';
+  const templateRec = JSON.stringify({ type: "assistant", content: template });
+  const realRec = JSON.stringify({ type: "assistant", content: real });
   writeFileSync(
     grok,
     `#!/bin/sh
 echo $$ > ${JSON.stringify(marker)}
 mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-tmpl"))}
-printf '%s\\n' ${JSON.stringify(template)} > ${JSON.stringify(sessionFile)}
+printf '%s\\n' ${JSON.stringify(templateRec)} > ${JSON.stringify(sessionFile)}
 sleep 1
-printf '%s\\n' ${JSON.stringify(real)} >> ${JSON.stringify(sessionFile)}
+printf '%s\\n' ${JSON.stringify(realRec)} >> ${JSON.stringify(sessionFile)}
 sleep 120
 `,
     { mode: 0o755 },
@@ -455,6 +459,77 @@ sleep 120
     expect(got).toBe(real);
     expect(got).not.toContain("<");
     expect(got).not.toBe(template);
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
+
+test("session jsonl ignores tool_result Ralph NEEDS_HUMAN and accepts assistant NO_WORK", () => {
+  const ralph =
+    'PILOT_VERDICT=NEEDS_HUMAN spec=- stage=- reason="nested under Ralph harness ..."';
+  const accepted = "PILOT_VERDICT=NO_WORK spec=-";
+  const tool = JSON.stringify({
+    type: "tool_result",
+    content: `flow-next-pilot SKILL.md\n  ${ralph}\n`,
+  });
+  const user = JSON.stringify({ type: "user", content: ralph });
+  const reasoning = JSON.stringify({ type: "reasoning", content: ralph });
+  const assistant = JSON.stringify({ type: "assistant", content: accepted });
+  expect(extractSessionVerdictLine(tool)).toBeUndefined();
+  expect(extractSessionVerdictLine(`${tool}\n${user}\n${reasoning}\nnot-json\n`)).toBeUndefined();
+  expect(extractSessionVerdictLine(`${tool}\n${assistant}\n`)).toBe(accepted);
+  expect(extractSessionVerdictLine(assistant)).toBe(accepted);
+});
+
+test("hostRun ignores tool_result Ralph NEEDS_HUMAN and accepts assistant NO_WORK", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "ralph-hang.pid");
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const sessionFile = join(grokSessionsDir(tree), "sess-ralph", "chat_history.jsonl");
+  const ralph =
+    'PILOT_VERDICT=NEEDS_HUMAN spec=- stage=- reason="nested under Ralph harness ..."';
+  const accepted = "PILOT_VERDICT=NO_WORK spec=-";
+  const toolRec = JSON.stringify({
+    type: "tool_result",
+    content: `flow-next-pilot SKILL.md\n  ${ralph}\n`,
+  });
+  const assistantRec = JSON.stringify({ type: "assistant", content: accepted });
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > ${JSON.stringify(marker)}
+mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-ralph"))}
+printf '%s\\n' ${JSON.stringify(toolRec)} > ${JSON.stringify(sessionFile)}
+sleep 1
+printf '%s\\n' ${JSON.stringify(assistantRec)} >> ${JSON.stringify(sessionFile)}
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    const elapsed = Date.now() - t0;
+    expect(elapsed).toBeGreaterThan(700);
+    expect(elapsed).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const got = ran.stdout.split(/\r?\n/).find((l) => /PILOT_VERDICT=/.test(l));
+    expect(got).toBe(accepted);
+    expect(got).not.toContain("NEEDS_HUMAN");
     await Bun.sleep(150);
     expect(existsSync(marker)).toBe(true);
     const pid = Number(readFileSync(marker, "utf8").trim());

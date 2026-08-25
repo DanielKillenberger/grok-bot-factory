@@ -279,7 +279,7 @@ function extractSessionVerdict(root: string): string | undefined {
     } catch {
       continue;
     }
-    const found = extractVerdictLine(text);
+    const found = extractSessionVerdictLine(text);
     if (found) return found;
   }
   return undefined;
@@ -298,6 +298,27 @@ function extractVerdictLine(text: string): string | undefined {
     const trimmed = raw.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").trim();
     const idx = firstVerdictIndex(trimmed);
     if (idx >= 0) return trimmed.slice(idx);
+  }
+  return undefined;
+}
+
+/**
+ * Session jsonl: only assistant records. Parse each line as JSON; skip parse
+ * failures and type user / tool_result / reasoning. Real verdicts are a
+ * terminal line in assistant.content. Typescript / PTY stay raw-text.
+ */
+export function extractSessionVerdictLine(text: string): string | undefined {
+  for (const raw of text.split(/\r\n|\n|\r/)) {
+    let rec: unknown;
+    try {
+      rec = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isObject(rec) || rec.type !== "assistant") continue;
+    if (typeof rec.content !== "string") continue;
+    const found = extractVerdictLine(rec.content);
+    if (found) return found;
   }
   return undefined;
 }
