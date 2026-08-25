@@ -3,6 +3,8 @@ name: factory-forward
 # Forwards a GitHub push to the Grok Bot factory webhook with Authorization: Bearer.
 # Native Settings webhooks cannot send that header. HMAC in the hook Secret is ignored.
 # Repo secrets only: GROK_BOT_WEBHOOK_URL, GROK_BOT_SENDER_KEY. Never commit them.
+# Cursor keeps User-Agent (and drops X-Factory-* plus the POST body), so identity
+# rides in User-Agent: factory-forward repo=... sha=... ref=...
 
 on:
   push:
@@ -24,6 +26,7 @@ jobs:
             echo "Missing GROK_BOT_WEBHOOK_URL or GROK_BOT_SENDER_KEY"
             exit 1
           fi
+          UA="factory-forward repo=${{ github.repository }} sha=${{ github.sha }} ref=${{ github.ref }}"
           curl -fsS -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer ${WEBHOOK_KEY}" \
             -H "Content-Type: application/json" \
@@ -31,4 +34,5 @@ jobs:
             -H "X-Factory-Repo: ${{ github.repository }}" \
             -H "X-Factory-Sha: ${{ github.sha }}" \
             -H "X-Factory-Ref: ${{ github.ref }}" \
+            -A "$UA" \
             --data-binary "@${GITHUB_EVENT_PATH}"
