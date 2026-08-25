@@ -1,0 +1,34 @@
+name: factory-forward
+
+# Forwards a GitHub push to the Grok Bot factory webhook with Authorization: Bearer.
+# Native Settings webhooks cannot send that header. HMAC in the hook Secret is ignored.
+# Repo secrets only: GROK_BOT_WEBHOOK_URL, GROK_BOT_SENDER_KEY. Never commit them.
+
+on:
+  push:
+    paths-ignore:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  forward:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Forward push payload
+        env:
+          WEBHOOK_URL: ${{ secrets.GROK_BOT_WEBHOOK_URL }}
+          WEBHOOK_KEY: ${{ secrets.GROK_BOT_SENDER_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_KEY:-}" ]; then
+            echo "Missing GROK_BOT_WEBHOOK_URL or GROK_BOT_SENDER_KEY"
+            exit 1
+          fi
+          curl -fsS -X POST "$WEBHOOK_URL" \
+            -H "Authorization: Bearer ${WEBHOOK_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -H "X-Factory-Repo: ${{ github.repository }}" \
+            -H "X-Factory-Sha: ${{ github.sha }}" \
+            -H "X-Factory-Ref: ${{ github.ref }}" \
+            --data-binary "@${GITHUB_EVENT_PATH}"
