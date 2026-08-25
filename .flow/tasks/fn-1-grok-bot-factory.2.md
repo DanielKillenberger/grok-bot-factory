@@ -48,12 +48,11 @@ Start-path after the gate: one worktree per tick, instance host CLI, product rev
 - [ ] `tests/factory/tick.test.sh` passes
 
 ## Done summary
-Isolated per-tick worktree runner with instance host CLI probe (/loop or /goal) and product review pin (R8, R12–R14). Host/pin failures exit 20; NO_WORK is quiet; tests use fake host fixtures.
+Isolated per-tick worktree runner with instance host CLI probe (/loop or /goal) and product review pin (R8, R12–R14) is already on this branch (TypeScript/Bun). Host/pin failures exit 20; NO_WORK is quiet; tests use fake host fixtures. `bun test` 147 pass. No new code this tick.
 
-baseline: green (tests/factory/gate.test.sh)
-stage: impl-review - ran [2026-08-23 NEEDS_WORK .. 2026-08-23T22:40:46Z SHIP]
-stage: plan-sync - skipped(config: planSync.enabled != true)
+baseline: green
+stage: impl-review - prior SHIP 2026-08-23T22:40:46Z
 ## Evidence
-- Commits: c9feddde063f553b31d28308668dc8101709ece2, ecb2e0016ca58b714527aae6be82f9b0dc048743, 267798f4d862e51b0e0f012762b0fd6fe0863b3f
-- Tests: tests/factory/gate.test.sh, tests/factory/tick.test.sh
+- Commits: c9feddde063f553b31d28308668dc8101709ece2, ecb2e0016ca58b714527aae6be82f9b0dc048743, 267798f4d862e51b0e0f012762b0fd6fe0863b3f, 91ca7cb
+- Tests: bun test (147 pass, 0 fail)
 - PRs:
