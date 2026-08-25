@@ -19,11 +19,11 @@ const ROUTING_ASSIGN_RE =
 const ROUTING_START = "flow-next:model-routing:start";
 const ROUTING_END = "flow-next:model-routing:end";
 
-/** Real host verdict tokens. Do not match the /loop template `PILOT_VERDICT=<...>`. */
+/** Real host verdict tokens. Require spec=/prs= so recipe prose and `<…>` templates miss. */
 export const PILOT_VERDICT_RE =
-  /PILOT_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\b/;
+  /PILOT_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\s+spec=/;
 export const LAND_VERDICT_RE =
-  /LAND_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\b/;
+  /LAND_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\s+prs=/;
 
 export type HostDrive = "loop" | "goal";
 

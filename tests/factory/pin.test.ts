@@ -406,6 +406,19 @@ test("verdict regex ignores /loop template and accepts a real NO_WORK line", () 
   expect(PILOT_VERDICT_RE.test("docs mention PILOT_VERDICT but not a token line")).toBe(false);
 });
 
+test("verdict regex ignores vault recipe prose and accepts a real NO_WORK line", () => {
+  const recipe =
+    "until it prints PILOT_VERDICT=NO_WORK or PILOT_VERDICT=NEEDS_HUMAN";
+  const real = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="no ready spec with satisfied deps"';
+  expect(PILOT_VERDICT_RE.test(recipe)).toBe(false);
+  expect(PILOT_VERDICT_RE.test(real)).toBe(true);
+  expect(real.match(PILOT_VERDICT_RE)?.[1]).toBe("NO_WORK");
+  expect(LAND_VERDICT_RE.test("until it prints LAND_VERDICT=NO_WORK or LAND_VERDICT=NEEDS_HUMAN")).toBe(
+    false,
+  );
+  expect(LAND_VERDICT_RE.test("LAND_VERDICT=NO_WORK prs=0")).toBe(true);
+});
+
 test("hostRun ignores PILOT_VERDICT template in session logs and accepts a real NO_WORK line", async () => {
   const tree = makeTree();
   const grok = join(checkout, "grok");
