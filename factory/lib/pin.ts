@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { basename } from "node:path";
-import { isExecutable, runCmd, which } from "./cmd.ts";
+import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, join } from "node:path";
+import { isExecutable, runCmd, which, whichOnPath } from "./cmd.ts";
 
 export const HOST_INVENTORY = [
   "claude",
@@ -17,6 +18,12 @@ const ROUTING_ASSIGN_RE =
   /(?:review\.backend|backend|reviewer)\s*[:=]\s*(\S+)/gi;
 const ROUTING_START = "flow-next:model-routing:start";
 const ROUTING_END = "flow-next:model-routing:end";
+
+/** Real host verdict tokens. Require spec=/prs= so recipe prose and `<…>` templates miss. */
+export const PILOT_VERDICT_RE =
+  /PILOT_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\s+spec=/;
+export const LAND_VERDICT_RE =
+  /LAND_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\s+prs=/;
 
 export type HostDrive = "loop" | "goal";
 
@@ -53,6 +60,10 @@ export async function hostProbe(
   if (!bin || !isExecutable(bin)) return { error: "missing host CLI" };
   const base = hostBasename(bin);
   if (!inInventory(base)) return { error: "host cannot run /loop or /goal" };
+  // Grok Build (basename `grok`) has /loop and /goal as slash commands, same
+  // idea as Claude Code, but `grok --help` does not print those strings.
+  // Inventory + grok basename is enough; drive is loop.
+  if (base === "grok") return { drive: "loop" };
   const help = await runCmd([bin, "--help"]);
   const drive = driveFromHelp(`${help.stdout}\n${help.stderr}`);
   if (!drive) return { error: "host cannot run /loop or /goal" };
@@ -212,19 +223,332 @@ export function routingBlockValidate(
   return { ok: true };
 }
 
+function shQuote(value: string): string {
+  return "'" + value.replaceAll("'", "'\\''") + "'";
+}
+
+/** Tick home is dirname(tree); grok's script(1) typescript lives there. */
+export function hostTypescriptPath(tree: string): string {
+  return join(dirname(tree), "host.typescript");
+}
+
+/**
+ * Grok writes the session transcript under
+ * ~/.grok/sessions/<encodeURIComponent(realpath(tree))>/<session-id>/.
+ * Watch only that tree-encoded directory — never all of ~/.grok.
+ */
+export function grokSessionsDir(tree: string): string {
+  const home = process.env.HOME && process.env.HOME.length > 0 ? process.env.HOME : homedir();
+  let real = tree;
+  try {
+    real = realpathSync(tree);
+  } catch {
+    // tree may not exist yet; encode the path we were given
+  }
+  return join(home, ".grok", "sessions", encodeURIComponent(real));
+}
+
+const SESSION_LOG_NAMES = new Set(["chat_history.jsonl", "updates.jsonl"]);
+
+function listSessionLogs(root: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, depth: number) => {
+    if (depth > 8) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isSymbolicLink()) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p, depth + 1);
+      else if (e.isFile() && SESSION_LOG_NAMES.has(e.name)) out.push(p);
+    }
+  };
+  walk(root, 0);
+  return out;
+}
+
+function extractSessionVerdict(root: string): string | undefined {
+  for (const file of listSessionLogs(root)) {
+    let text = "";
+    try {
+      text = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    const found = extractSessionVerdictLine(text);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function firstVerdictIndex(text: string): number {
+  const p = text.search(PILOT_VERDICT_RE);
+  const l = text.search(LAND_VERDICT_RE);
+  if (p < 0) return l;
+  if (l < 0) return p;
+  return Math.min(p, l);
+}
+
+function extractVerdictLine(text: string): string | undefined {
+  for (const raw of text.split(/\r\n|\n|\r/)) {
+    const trimmed = raw.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").trim();
+    const idx = firstVerdictIndex(trimmed);
+    if (idx >= 0) return trimmed.slice(idx);
+  }
+  return undefined;
+}
+
+/**
+ * Session jsonl: only assistant records. Parse each line as JSON; skip parse
+ * failures and type user / tool_result / reasoning. Real verdicts are a
+ * terminal line in assistant.content. Typescript / PTY stay raw-text.
+ */
+export function extractSessionVerdictLine(text: string): string | undefined {
+  for (const raw of text.split(/\r\n|\n|\r/)) {
+    let rec: unknown;
+    try {
+      rec = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isObject(rec) || rec.type !== "assistant") continue;
+    if (typeof rec.content !== "string") continue;
+    const found = extractVerdictLine(rec.content);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function hostEnv(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined) out[k] = v;
+  }
+  out.FACTORY_CLAIM_POLICY = "skip-foreign";
+  return out;
+}
+
+function readChildPids(pid: number): number[] {
+  const out: number[] = [];
+  let tasks: string[] = [];
+  try {
+    tasks = readdirSync(`/proc/${pid}/task`);
+  } catch {
+    return out;
+  }
+  for (const t of tasks) {
+    try {
+      const text = readFileSync(`/proc/${pid}/task/${t}/children`, "utf8");
+      for (const p of text.trim().split(/\s+/)) {
+        const n = Number(p);
+        if (Number.isInteger(n) && n > 1) out.push(n);
+      }
+    } catch {
+      // process already gone
+    }
+  }
+  return out;
+}
+
+function readPgid(pid: number): number | undefined {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const close = stat.lastIndexOf(")");
+    if (close < 0) return undefined;
+    const rest = stat.slice(close + 2).split(" ");
+    const pgid = Number(rest[2]);
+    return Number.isInteger(pgid) && pgid > 1 ? pgid : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function signalProcessTree(root: number, signal: "SIGTERM" | "SIGKILL"): void {
+  const pids = new Set<number>();
+  const stack = [root];
+  while (stack.length) {
+    const pid = stack.pop()!;
+    if (pids.has(pid)) continue;
+    pids.add(pid);
+    for (const c of readChildPids(pid)) stack.push(c);
+  }
+  const mine = readPgid(process.pid) ?? process.pid;
+  const pgids = new Set<number>();
+  for (const pid of pids) {
+    const g = readPgid(pid);
+    if (g !== undefined && g !== mine) pgids.add(g);
+  }
+  for (const g of pgids) {
+    try {
+      process.kill(-g, signal);
+    } catch {
+      // already gone
+    }
+  }
+  for (const pid of pids) {
+    if (pid === process.pid) continue;
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // already gone
+    }
+  }
+}
+
+async function pumpStream(
+  stream: ReadableStream<Uint8Array>,
+  chunks: string[],
+  onChunk: () => void,
+): Promise<void> {
+  const reader = stream.getReader();
+  const dec = new TextDecoder();
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    chunks.push(dec.decode(value, { stream: true }));
+    onChunk();
+  }
+}
+
+async function runGrokHost(
+  argv: readonly string[],
+  opts: { cwd: string; typescript: string; sessionsDir: string; timeoutMs: number },
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  writeFileSync(opts.typescript, "");
+  const proc = Bun.spawn([...argv], {
+    cwd: opts.cwd,
+    env: hostEnv(),
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    // Own process group so we can SIGTERM/SIGKILL script+grok without this process.
+    detached: true,
+  });
+  const stdoutChunks: string[] = [];
+  const stderrChunks: string[] = [];
+  let verdict: string | undefined;
+  let stoppedForVerdict = false;
+  let grace: ReturnType<typeof setTimeout> | undefined;
+
+  const killTree = (signal: "SIGTERM" | "SIGKILL") => {
+    if (proc.pid !== undefined) signalProcessTree(proc.pid, signal);
+    try {
+      proc.kill(signal);
+    } catch {
+      // already exited
+    }
+  };
+
+  const stillRunning = (): boolean => proc.exitCode == null;
+
+  const consider = () => {
+    if (verdict) return;
+    let tsText = "";
+    try {
+      tsText = readFileSync(opts.typescript, "utf8");
+    } catch {
+      tsText = "";
+    }
+    const found =
+      extractVerdictLine(stdoutChunks.join("")) ??
+      extractVerdictLine(tsText) ??
+      extractSessionVerdict(opts.sessionsDir);
+    if (!found) return;
+    verdict = found;
+    // A host that prints a verdict and exits (including nonzero) must keep that
+    // exit code. Only SIGTERM if it is still running — the live grok hang.
+    if (!stillRunning()) return;
+    grace = setTimeout(() => {
+      if (!stillRunning()) return;
+      stoppedForVerdict = true;
+      killTree("SIGTERM");
+    }, 250);
+  };
+
+  const timer = setTimeout(() => {
+    killTree("SIGKILL");
+  }, opts.timeoutMs);
+  const poll = setInterval(consider, 50);
+
+  try {
+    await Promise.all([
+      pumpStream(proc.stdout, stdoutChunks, consider),
+      pumpStream(proc.stderr, stderrChunks, () => {}),
+      proc.exited,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    clearInterval(poll);
+    if (grace) clearTimeout(grace);
+  }
+  consider();
+
+  const stdout = stdoutChunks.join("");
+  const stderr = stderrChunks.join("");
+  let tsText = "";
+  try {
+    tsText = readFileSync(opts.typescript, "utf8");
+  } catch {
+    tsText = "";
+  }
+
+  if (stoppedForVerdict && verdict) {
+    return { code: 0, stdout: `${verdict}\n`, stderr };
+  }
+  const captured = stdout.length > 0 ? stdout : tsText;
+  return { code: proc.exitCode ?? 1, stdout: captured, stderr };
+}
+
+export function hostArgv(
+  host: string,
+  drive: HostDrive,
+  skill: string,
+  typescript?: string,
+): string[] | { error: string } {
+  // Grok Build slash commands are one prompt string. Claude-shaped hosts take
+  // split argv (`/loop` `10m` <skill> or `/goal` <skill>).
+  if (hostBasename(host) === "grok") {
+    // grok 1.0.5 opens /dev/tty and exits ENXIO without a PTY. script(1) gives
+    // one. --always-approve so a factory tick cannot block on a permission
+    // prompt. Missing script(1) is stuck — never drop to no-TTY grok.
+    // -f flushes the typescript so a hanging grok still surfaces PILOT/LAND_VERDICT.
+    const scriptBin = whichOnPath("script");
+    if (!scriptBin) return { error: "script(1) missing; grok needs a PTY" };
+    if (!typescript) return { error: "missing host typescript path" };
+    const prompt = drive === "loop" ? `/loop 10m ${skill}` : `/goal ${skill}`;
+    const cmd = `${shQuote(host)} --always-approve --no-alt-screen ${shQuote(prompt)}`;
+    return [scriptBin, "-q", "-e", "-f", "-c", cmd, typescript];
+  }
+  return drive === "loop" ? [host, "/loop", "10m", skill] : [host, "/goal", skill];
+}
+
 export async function hostRun(
   host: string,
   drive: HostDrive,
   kind: "pilot" | "land",
   tree: string,
-): Promise<{ code: number; stdout: string; stderr: string }> {
+): Promise<{ code: number; stdout: string; stderr: string } | { error: string }> {
   const skill = kind === "land" ? "/flow-next:land" : "/flow-next:pilot";
-  const argv =
-    drive === "loop" ? [host, "/loop", "10m", skill] : [host, "/goal", skill];
+  const typescript = hostBasename(host) === "grok" ? hostTypescriptPath(tree) : undefined;
+  const argv = hostArgv(host, drive, skill, typescript);
+  if (!Array.isArray(argv)) return argv;
+  const timeoutMs = Number(process.env.FACTORY_HOST_TIMEOUT_MS ?? 3_600_000);
   // Host ticks can run for a long time; do not apply the gh/git command deadline.
+  if (typescript) {
+    return runGrokHost(argv, {
+      cwd: tree,
+      typescript,
+      sessionsDir: grokSessionsDir(tree),
+      timeoutMs,
+    });
+  }
   return runCmd(argv, {
     cwd: tree,
     env: { FACTORY_CLAIM_POLICY: "skip-foreign" },
-    timeoutMs: Number(process.env.FACTORY_HOST_TIMEOUT_MS ?? 3_600_000),
+    timeoutMs,
   });
 }

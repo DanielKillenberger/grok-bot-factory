@@ -7,6 +7,8 @@ import {
   hostProbe,
   hostResolve,
   hostRun,
+  LAND_VERDICT_RE,
+  PILOT_VERDICT_RE,
   reviewPinRead,
   reviewPinValidate,
   routingBlockRead,
@@ -115,6 +117,19 @@ async function parseStart(
   stuck("missing gate start output");
 }
 
+function firstHostReasonLine(text: string): string | undefined {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.length > 0 && !/^(PILOT|LAND)_VERDICT=/.test(l));
+}
+
+function hostExitReason(code: number, stderr: string, stdout = ""): string {
+  // script(1) copies the child PTY to stdout, so grok's "stderr" may land there.
+  const line = firstHostReasonLine(stderr) ?? firstHostReasonLine(stdout);
+  return line ? `host exited ${code}: ${line}` : `host exited ${code}`;
+}
+
 export async function runTick(argv: string[]): Promise<void> {
   const { flags, rest } = parseArgs(argv, ALLOWED);
   if (flags.has("host")) process.env.FACTORY_HOST = flags.get("host");
@@ -201,20 +216,20 @@ export async function runTick(argv: string[]): Promise<void> {
     const routingBefore = routing.blocks.map((b) => ({ file: b.file, block: b.block }));
 
     const ran = await hostRun(resolved.bin, probed.drive, tick.kind, tick.tree);
+    if ("error" in ran) stuck(ran.error);
     if (ran.code !== 0) {
       try {
         tickLog(tick, "invoke", { rc: String(ran.code), verdict: "", drive: probed.drive });
       } catch {
         // ignore
       }
-      stuck(`host exited ${ran.code}`);
+      stuck(hostExitReason(ran.code, ran.stderr, ran.stdout));
     }
 
-    const verdictRe = tick.kind === "land" ? /^LAND_VERDICT=/ : /^PILOT_VERDICT=/;
+    const verdictRe = tick.kind === "land" ? LAND_VERDICT_RE : PILOT_VERDICT_RE;
     const lines = ran.stdout.split(/\r?\n/).filter((l) => verdictRe.test(l));
     const last = lines.at(-1) ?? "";
-    const raw = last.includes("=") ? last.slice(last.indexOf("=") + 1) : "";
-    const verdict = raw.split(/\s/)[0] ?? "";
+    const verdict = last.match(verdictRe)?.[1] ?? "";
     tickLog(tick, "invoke", { rc: String(ran.code), verdict, drive: probed.drive });
 
     if (cfgExisted) {

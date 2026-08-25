@@ -7,6 +7,9 @@ const argv = process.argv.slice(2);
 if (process.env.FACTORY_HOST_LOG) {
   appendFileSync(process.env.FACTORY_HOST_LOG, `${argv.join(" ")}\n`);
 }
+if (process.env.FACTORY_HOST_ARGV_LOG) {
+  appendFileSync(process.env.FACTORY_HOST_ARGV_LOG, `${JSON.stringify(argv)}\n`);
+}
 if (process.env.FACTORY_HOST_PWD_LOG) {
   appendFileSync(process.env.FACTORY_HOST_PWD_LOG, `${process.cwd()}\n`);
 }

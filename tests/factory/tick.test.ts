@@ -9,6 +9,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { hostArgv } from "../../factory/lib/pin.ts";
+import { whichOnPath } from "../../factory/lib/cmd.ts";
 import { repoKey } from "../../factory/lib/worktree.ts";
 import {
   BUN,
@@ -54,6 +56,7 @@ function baseEnv(extra: Record<string, string | undefined> = {}) {
     FACTORY_HOST_SLEEP: undefined,
     FACTORY_HOST_EXIT: undefined,
     FACTORY_HOST_MUTATE: undefined,
+    FACTORY_HOST_ARGV_LOG: undefined,
     ...extra,
   };
 }
@@ -117,8 +120,79 @@ test("missing host CLI", async () => {
 });
 
 test("host without /loop or /goal", async () => {
-  const res = await runTick(tickArgs(), { FACTORY_HOST_HELP: "none" });
+  linkStub(bin, "claude", STUB_HOST);
+  const res = await runTick(
+    [
+      "--host",
+      join(bin, "claude"),
+      "--worktree-root",
+      wt,
+      "--clone-url",
+      product,
+      "acme/app",
+      sha,
+      "pilot",
+    ],
+    { FACTORY_HOST_HELP: "none" },
+  );
   expect(res.code).toBe(20);
+});
+
+test("grok host without /loop in help still probes as loop", async () => {
+  const argvLog = join(tmp, "argv.jsonl");
+  const res = await runTick(tickArgs(), {
+    FACTORY_HOST_HELP: "none",
+    FACTORY_HOST_ARGV_LOG: argvLog,
+  });
+  expect(res.code, res.stderr).toBe(0);
+  expect(readFileSync(hostLog, "utf8")).toContain("/loop");
+  const invokes = readFileSync(argvLog, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as string[]);
+  const grok = join(bin, "grok");
+  const run = invokes.find((a) => a.some((arg) => arg.includes("/loop")));
+  expect(run).toEqual(["--always-approve", "--no-alt-screen", "/loop 10m /flow-next:pilot"]);
+  const typescript = join(tmp, "host.typescript");
+  const wrapped = hostArgv(grok, "loop", "/flow-next:pilot", typescript);
+  expect(Array.isArray(wrapped)).toBe(true);
+  if (Array.isArray(wrapped)) {
+    expect(wrapped).toEqual([
+      whichOnPath("script") as string,
+      "-q",
+      "-e",
+      "-f",
+      "-c",
+      `'${grok}' --always-approve --no-alt-screen '/loop 10m /flow-next:pilot'`,
+      typescript,
+    ]);
+  }
+});
+
+test("generic fake host keeps Claude-shaped split /loop argv", async () => {
+  linkStub(bin, "claude", STUB_HOST);
+  const argvLog = join(tmp, "argv.jsonl");
+  const res = await runTick(
+    [
+      "--host",
+      join(bin, "claude"),
+      "--worktree-root",
+      wt,
+      "--clone-url",
+      product,
+      "acme/app",
+      sha,
+      "pilot",
+    ],
+    { FACTORY_HOST_HELP: "loop", FACTORY_HOST_ARGV_LOG: argvLog },
+  );
+  expect(res.code, res.stderr).toBe(0);
+  const invokes = readFileSync(argvLog, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as string[]);
+  const run = invokes.find((a) => a.includes("/loop"));
+  expect(run).toEqual(["/loop", "10m", "/flow-next:pilot"]);
 });
 
 test("unfulfillable review pin (unknown backend)", async () => {
@@ -463,9 +537,35 @@ test("symlink-escape logs refused", async () => {
   expect(res.code).toBe(20);
 });
 
+test("missing script(1) is stuck for grok host", async () => {
+  const isolated = join(tmp, "no-script");
+  mkdirSync(isolated, { recursive: true });
+  linkStub(isolated, "grok", STUB_HOST);
+  writeFileSync(join(isolated, "git"), "#!/bin/sh\nexec /usr/bin/git \"$@\"\n", { mode: 0o755 });
+  const res = await runTick(
+    [
+      "--host",
+      join(isolated, "grok"),
+      "--worktree-root",
+      wt,
+      "--clone-url",
+      product,
+      "acme/app",
+      sha,
+      "pilot",
+    ],
+    { PATH: isolated },
+  );
+  expect(res.code).toBe(20);
+  expect(res.stderr.toLowerCase()).toMatch(/script/);
+  expect(res.stderr).toMatch(/PTY|pty/);
+});
+
 test("host nonzero is stuck", async () => {
   const res = await runTick(tickArgs(), { FACTORY_HOST_EXIT: "1" });
   expect(res.code).toBe(20);
+  expect(res.stderr).toContain("host exited 1");
+  expect(res.stderr).toContain("also mentions NO_WORK in stderr");
 });
 
 test("deleted review pin is stuck", async () => {

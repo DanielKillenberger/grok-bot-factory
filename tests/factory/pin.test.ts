@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { whichOnPath } from "../../factory/lib/cmd.ts";
 import {
+  extractSessionVerdictLine,
+  grokSessionsDir,
+  hostArgv,
+  hostProbe,
+  hostRun,
+  hostTypescriptPath,
+  LAND_VERDICT_RE,
+  PILOT_VERDICT_RE,
   reviewPinValidate,
   routingBlockRead,
   routingBlockValidate,
@@ -157,4 +166,385 @@ test("routingBlockRead inspects AGENTS.md even when CLAUDE.md is valid", () => {
   );
   const result = routingBlockRead(checkout);
   expect("error" in result).toBe(true);
+});
+
+test("grok-named stub without /loop in help probes as loop", async () => {
+  const grok = join(checkout, "grok");
+  writeFileSync(grok, "#!/bin/sh\necho usage: grok\n", { mode: 0o755 });
+  expect(await hostProbe(grok)).toEqual({ drive: "loop" });
+});
+
+test("inventory host without /loop or /goal still fails probe", async () => {
+  const claude = join(checkout, "claude");
+  writeFileSync(claude, "#!/bin/sh\necho usage: claude\n", { mode: 0o755 });
+  const result = await hostProbe(claude);
+  expect("error" in result).toBe(true);
+});
+
+test("missing host still fails probe", async () => {
+  const result = await hostProbe(join(checkout, "no-such-host"));
+  expect("error" in result).toBe(true);
+  if ("error" in result) expect(result.error).toMatch(/missing/);
+});
+
+test("unexecutable grok still fails probe", async () => {
+  const grok = join(checkout, "grok");
+  writeFileSync(grok, "#!/bin/sh\necho usage: grok\n", { mode: 0o644 });
+  const result = await hostProbe(grok);
+  expect("error" in result).toBe(true);
+  if ("error" in result) expect(result.error).toMatch(/missing/);
+});
+
+function writeArgvHost(path: string, argvLog: string): void {
+  writeFileSync(
+    path,
+    `#!/usr/bin/env bun
+import { appendFileSync } from "node:fs";
+appendFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)) + "\\n");
+process.exit(0);
+`,
+    { mode: 0o755 },
+  );
+}
+
+function expectOkRun(
+  ran: { code: number; stdout: string; stderr: string } | { error: string },
+): { code: number; stdout: string; stderr: string } {
+  expect("error" in ran, "error" in ran ? ran.error : "").toBe(false);
+  if ("error" in ran) throw new Error(ran.error);
+  return ran;
+}
+
+function expectGrokScriptArgv(
+  host: string,
+  drive: "loop" | "goal",
+  skill: string,
+  typescript: string,
+): string[] {
+  const built = hostArgv(host, drive, skill, typescript);
+  expect(Array.isArray(built), Array.isArray(built) ? "" : built.error).toBe(true);
+  if (!Array.isArray(built)) throw new Error(built.error);
+  const scriptBin = whichOnPath("script");
+  expect(scriptBin).toBeTruthy();
+  const prompt = drive === "loop" ? `/loop 10m ${skill}` : `/goal ${skill}`;
+  expect(built).toEqual([
+    scriptBin as string,
+    "-q",
+    "-e",
+    "-f",
+    "-c",
+    `'${host}' --always-approve --no-alt-screen '${prompt}'`,
+    typescript,
+  ]);
+  return built;
+}
+
+function makeTree(): string {
+  const tree = join(checkout, "tree");
+  mkdirSync(tree, { recursive: true });
+  return tree;
+}
+
+test("hostRun grok loop is script PTY + one prompt", async () => {
+  const grok = join(checkout, "grok");
+  const tree = makeTree();
+  const argvLog = join(checkout, "argv.jsonl");
+  writeArgvHost(grok, argvLog);
+  expectGrokScriptArgv(grok, "loop", "/flow-next:pilot", hostTypescriptPath(tree));
+  const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+  expect(ran.code).toBe(0);
+  const argv = JSON.parse(readFileSync(argvLog, "utf8").trim()) as string[];
+  expect(argv).toEqual(["--always-approve", "--no-alt-screen", "/loop 10m /flow-next:pilot"]);
+  expect(argv.join(" ")).toContain("/loop");
+  expect(existsSync(hostTypescriptPath(tree))).toBe(true);
+});
+
+test("hostRun grok goal is script PTY + one prompt", async () => {
+  const grok = join(checkout, "grok");
+  const tree = makeTree();
+  const argvLog = join(checkout, "argv.jsonl");
+  writeArgvHost(grok, argvLog);
+  expectGrokScriptArgv(grok, "goal", "/flow-next:land", hostTypescriptPath(tree));
+  const ran = expectOkRun(await hostRun(grok, "goal", "land", tree));
+  expect(ran.code).toBe(0);
+  expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual([
+    "--always-approve",
+    "--no-alt-screen",
+    "/goal /flow-next:land",
+  ]);
+  expect(existsSync(hostTypescriptPath(tree))).toBe(true);
+});
+
+test("hostRun generic inventory host keeps split argv", async () => {
+  const claude = join(checkout, "claude");
+  const tree = makeTree();
+  const argvLog = join(checkout, "argv.jsonl");
+  writeArgvHost(claude, argvLog);
+  expect(hostArgv(claude, "loop", "/flow-next:pilot")).toEqual([
+    claude,
+    "/loop",
+    "10m",
+    "/flow-next:pilot",
+  ]);
+  const ran = expectOkRun(await hostRun(claude, "loop", "pilot", tree));
+  expect(ran.code).toBe(0);
+  expect(JSON.parse(readFileSync(argvLog, "utf8").trim())).toEqual([
+    "/loop",
+    "10m",
+    "/flow-next:pilot",
+  ]);
+  expect(existsSync(hostTypescriptPath(tree))).toBe(false);
+});
+
+test("hostRun stops a hanging grok after the first PILOT_VERDICT line", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "hanging.pid");
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > "${marker}"
+echo 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="hang-stub"'
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    expect(Date.now() - t0).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const line = ran.stdout.split(/\r?\n/).find((l) => l.startsWith("PILOT_VERDICT="));
+    expect(line).toBe('PILOT_VERDICT=NO_WORK spec=- stage=- reason="hang-stub"');
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
+
+
+
+test("grok session watch path is encodeURIComponent(realpath(tree))", () => {
+  const tree = makeTree();
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  try {
+    const dir = grokSessionsDir(tree);
+    const encoded = encodeURIComponent(realpathSync(tree));
+    expect(dir).toBe(join(fakeHome, ".grok", "sessions", encoded));
+    expect(dir.startsWith(join(fakeHome, ".grok", "sessions") + "/")).toBe(true);
+    expect(dir.endsWith(encoded)).toBe(true);
+    expect(dir.includes("/.grok/sessions/")).toBe(true);
+    expect(dir).not.toBe(join(fakeHome, ".grok"));
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+  }
+});
+
+test("hostRun stops a hanging grok after PILOT_VERDICT in session chat_history.jsonl", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "session-hang.pid");
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const sessionFile = join(grokSessionsDir(tree), "sess-test", "chat_history.jsonl");
+  const line = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="session-stub"';
+  const rec = JSON.stringify({ type: "assistant", content: line });
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > ${JSON.stringify(marker)}
+mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-test"))}
+cat > ${JSON.stringify(sessionFile)} << 'EOF'
+{"type":"assistant","content":"no verdict in this json field"}
+${rec}
+EOF
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    expect(Date.now() - t0).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const got = ran.stdout.split(/\r?\n/).find((l) => l.startsWith("PILOT_VERDICT="));
+    expect(got).toBe(line);
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
+
+test("verdict regex ignores /loop template and accepts a real NO_WORK line", () => {
+  const template = "PILOT_VERDICT=<ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN>";
+  const real = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="no ready spec with satisfied deps"';
+  expect(PILOT_VERDICT_RE.test(template)).toBe(false);
+  expect(PILOT_VERDICT_RE.test(real)).toBe(true);
+  expect(real.match(PILOT_VERDICT_RE)?.[1]).toBe("NO_WORK");
+  expect(LAND_VERDICT_RE.test("LAND_VERDICT=<ADVANCED|ASKED|NO_WORK>")).toBe(false);
+  expect(LAND_VERDICT_RE.test("LAND_VERDICT=NO_WORK prs=0")).toBe(true);
+  expect(PILOT_VERDICT_RE.test("docs mention PILOT_VERDICT but not a token line")).toBe(false);
+});
+
+test("verdict regex ignores vault recipe prose and accepts a real NO_WORK line", () => {
+  const recipe =
+    "until it prints PILOT_VERDICT=NO_WORK or PILOT_VERDICT=NEEDS_HUMAN";
+  const real = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="no ready spec with satisfied deps"';
+  expect(PILOT_VERDICT_RE.test(recipe)).toBe(false);
+  expect(PILOT_VERDICT_RE.test(real)).toBe(true);
+  expect(real.match(PILOT_VERDICT_RE)?.[1]).toBe("NO_WORK");
+  expect(LAND_VERDICT_RE.test("until it prints LAND_VERDICT=NO_WORK or LAND_VERDICT=NEEDS_HUMAN")).toBe(
+    false,
+  );
+  expect(LAND_VERDICT_RE.test("LAND_VERDICT=NO_WORK prs=0")).toBe(true);
+});
+
+test("hostRun ignores PILOT_VERDICT template in session logs and accepts a real NO_WORK line", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "template-hang.pid");
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const sessionFile = join(grokSessionsDir(tree), "sess-tmpl", "chat_history.jsonl");
+  const template = "PILOT_VERDICT=<ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN>";
+  const real = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="no ready spec with satisfied deps"';
+  const templateRec = JSON.stringify({ type: "assistant", content: template });
+  const realRec = JSON.stringify({ type: "assistant", content: real });
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > ${JSON.stringify(marker)}
+mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-tmpl"))}
+printf '%s\\n' ${JSON.stringify(templateRec)} > ${JSON.stringify(sessionFile)}
+sleep 1
+printf '%s\\n' ${JSON.stringify(realRec)} >> ${JSON.stringify(sessionFile)}
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    const elapsed = Date.now() - t0;
+    expect(elapsed).toBeGreaterThan(700);
+    expect(elapsed).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const got = ran.stdout.split(/\r?\n/).find((l) => /PILOT_VERDICT=/.test(l));
+    expect(got).toBe(real);
+    expect(got).not.toContain("<");
+    expect(got).not.toBe(template);
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
+
+test("session jsonl ignores tool_result Ralph NEEDS_HUMAN and accepts assistant NO_WORK", () => {
+  const ralph =
+    'PILOT_VERDICT=NEEDS_HUMAN spec=- stage=- reason="nested under Ralph harness ..."';
+  const accepted = "PILOT_VERDICT=NO_WORK spec=-";
+  const tool = JSON.stringify({
+    type: "tool_result",
+    content: `flow-next-pilot SKILL.md\n  ${ralph}\n`,
+  });
+  const user = JSON.stringify({ type: "user", content: ralph });
+  const reasoning = JSON.stringify({ type: "reasoning", content: ralph });
+  const assistant = JSON.stringify({ type: "assistant", content: accepted });
+  expect(extractSessionVerdictLine(tool)).toBeUndefined();
+  expect(extractSessionVerdictLine(`${tool}\n${user}\n${reasoning}\nnot-json\n`)).toBeUndefined();
+  expect(extractSessionVerdictLine(`${tool}\n${assistant}\n`)).toBe(accepted);
+  expect(extractSessionVerdictLine(assistant)).toBe(accepted);
+});
+
+test("hostRun ignores tool_result Ralph NEEDS_HUMAN and accepts assistant NO_WORK", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "ralph-hang.pid");
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const sessionFile = join(grokSessionsDir(tree), "sess-ralph", "chat_history.jsonl");
+  const ralph =
+    'PILOT_VERDICT=NEEDS_HUMAN spec=- stage=- reason="nested under Ralph harness ..."';
+  const accepted = "PILOT_VERDICT=NO_WORK spec=-";
+  const toolRec = JSON.stringify({
+    type: "tool_result",
+    content: `flow-next-pilot SKILL.md\n  ${ralph}\n`,
+  });
+  const assistantRec = JSON.stringify({ type: "assistant", content: accepted });
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > ${JSON.stringify(marker)}
+mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-ralph"))}
+printf '%s\\n' ${JSON.stringify(toolRec)} > ${JSON.stringify(sessionFile)}
+sleep 1
+printf '%s\\n' ${JSON.stringify(assistantRec)} >> ${JSON.stringify(sessionFile)}
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    const elapsed = Date.now() - t0;
+    expect(elapsed).toBeGreaterThan(700);
+    expect(elapsed).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const got = ran.stdout.split(/\r?\n/).find((l) => /PILOT_VERDICT=/.test(l));
+    expect(got).toBe(accepted);
+    expect(got).not.toContain("NEEDS_HUMAN");
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
+
+test("whichOnPath does not find script on an empty PATH", () => {
+  expect(whichOnPath("script", "")).toBeNull();
+  expect(whichOnPath("script", "/tmp/no-such-bin")).toBeNull();
+  expect(whichOnPath("script")).toMatch(/\/script$/);
 });
