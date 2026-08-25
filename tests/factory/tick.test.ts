@@ -583,6 +583,18 @@ test("host NEEDS_HUMAN is stuck", async () => {
   expect(res.code).toBe(20);
 });
 
+test("pilot tick ADVANCED is quiet", async () => {
+  const res = await runTick(tickArgs(), { FACTORY_HOST_VERDICT: "ADVANCED" });
+  expect(res.code, res.stderr).toBe(0);
+  expect(res.stderr).not.toContain("host produced no verdict");
+});
+
+test("land tick ADVANCED is quiet", async () => {
+  const res = await runTick(tickArgs("land"), { FACTORY_HOST_VERDICT: "ADVANCED" });
+  expect(res.code, res.stderr).toBe(0);
+  expect(res.stderr).not.toContain("host produced no verdict");
+});
+
 test("PILOT_VERDICT=NO_WORK with metadata fields", async () => {
   const res = await runTick(tickArgs());
   expect(res.code).toBe(0);
