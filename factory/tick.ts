@@ -7,6 +7,8 @@ import {
   hostProbe,
   hostResolve,
   hostRun,
+  LAND_VERDICT_RE,
+  PILOT_VERDICT_RE,
   reviewPinRead,
   reviewPinValidate,
   routingBlockRead,
@@ -224,11 +226,10 @@ export async function runTick(argv: string[]): Promise<void> {
       stuck(hostExitReason(ran.code, ran.stderr, ran.stdout));
     }
 
-    const verdictRe = tick.kind === "land" ? /^LAND_VERDICT=/ : /^PILOT_VERDICT=/;
+    const verdictRe = tick.kind === "land" ? LAND_VERDICT_RE : PILOT_VERDICT_RE;
     const lines = ran.stdout.split(/\r?\n/).filter((l) => verdictRe.test(l));
     const last = lines.at(-1) ?? "";
-    const raw = last.includes("=") ? last.slice(last.indexOf("=") + 1) : "";
-    const verdict = raw.split(/\s/)[0] ?? "";
+    const verdict = last.match(verdictRe)?.[1] ?? "";
     tickLog(tick, "invoke", { rc: String(ran.code), verdict, drive: probed.drive });
 
     if (cfgExisted) {

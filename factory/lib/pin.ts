@@ -19,6 +19,12 @@ const ROUTING_ASSIGN_RE =
 const ROUTING_START = "flow-next:model-routing:start";
 const ROUTING_END = "flow-next:model-routing:end";
 
+/** Real host verdict tokens. Do not match the /loop template `PILOT_VERDICT=<...>`. */
+export const PILOT_VERDICT_RE =
+  /PILOT_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\b/;
+export const LAND_VERDICT_RE =
+  /LAND_VERDICT=(ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN)\b/;
+
 export type HostDrive = "loop" | "goal";
 
 export type RoutingBlock = {
@@ -279,10 +285,18 @@ function extractSessionVerdict(root: string): string | undefined {
   return undefined;
 }
 
+function firstVerdictIndex(text: string): number {
+  const p = text.search(PILOT_VERDICT_RE);
+  const l = text.search(LAND_VERDICT_RE);
+  if (p < 0) return l;
+  if (l < 0) return p;
+  return Math.min(p, l);
+}
+
 function extractVerdictLine(text: string): string | undefined {
   for (const raw of text.split(/\r\n|\n|\r/)) {
     const trimmed = raw.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").trim();
-    const idx = trimmed.search(/(?:PILOT|LAND)_VERDICT=/);
+    const idx = firstVerdictIndex(trimmed);
     if (idx >= 0) return trimmed.slice(idx);
   }
   return undefined;

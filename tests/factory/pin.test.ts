@@ -8,6 +8,8 @@ import {
   hostProbe,
   hostRun,
   hostTypescriptPath,
+  LAND_VERDICT_RE,
+  PILOT_VERDICT_RE,
   reviewPinValidate,
   routingBlockRead,
   routingBlockValidate,
@@ -380,6 +382,66 @@ sleep 120
     expect(ran.code).toBe(0);
     const got = ran.stdout.split(/\r?\n/).find((l) => l.startsWith("PILOT_VERDICT="));
     expect(got).toBe(line);
+    await Bun.sleep(150);
+    expect(existsSync(marker)).toBe(true);
+    const pid = Number(readFileSync(marker, "utf8").trim());
+    expect(pid).toBeGreaterThan(0);
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevTimeout === undefined) delete process.env.FACTORY_HOST_TIMEOUT_MS;
+    else process.env.FACTORY_HOST_TIMEOUT_MS = prevTimeout;
+  }
+}, 15_000);
+
+test("verdict regex ignores /loop template and accepts a real NO_WORK line", () => {
+  const template = "PILOT_VERDICT=<ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN>";
+  const real = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="no ready spec with satisfied deps"';
+  expect(PILOT_VERDICT_RE.test(template)).toBe(false);
+  expect(PILOT_VERDICT_RE.test(real)).toBe(true);
+  expect(real.match(PILOT_VERDICT_RE)?.[1]).toBe("NO_WORK");
+  expect(LAND_VERDICT_RE.test("LAND_VERDICT=<ADVANCED|ASKED|NO_WORK>")).toBe(false);
+  expect(LAND_VERDICT_RE.test("LAND_VERDICT=NO_WORK prs=0")).toBe(true);
+  expect(PILOT_VERDICT_RE.test("docs mention PILOT_VERDICT but not a token line")).toBe(false);
+});
+
+test("hostRun ignores PILOT_VERDICT template in session logs and accepts a real NO_WORK line", async () => {
+  const tree = makeTree();
+  const grok = join(checkout, "grok");
+  const marker = join(checkout, "template-hang.pid");
+  const fakeHome = join(checkout, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const sessionFile = join(grokSessionsDir(tree), "sess-tmpl", "chat_history.jsonl");
+  const template = "PILOT_VERDICT=<ADVANCED|ASKED|NO_WORK|DEFERRED_TO_LAND|BLOCKED|NEEDS_HUMAN>";
+  const real = 'PILOT_VERDICT=NO_WORK spec=- stage=- reason="no ready spec with satisfied deps"';
+  writeFileSync(
+    grok,
+    `#!/bin/sh
+echo $$ > ${JSON.stringify(marker)}
+mkdir -p ${JSON.stringify(join(grokSessionsDir(tree), "sess-tmpl"))}
+printf '%s\\n' ${JSON.stringify(template)} > ${JSON.stringify(sessionFile)}
+sleep 1
+printf '%s\\n' ${JSON.stringify(real)} >> ${JSON.stringify(sessionFile)}
+sleep 120
+`,
+    { mode: 0o755 },
+  );
+  const prevTimeout = process.env.FACTORY_HOST_TIMEOUT_MS;
+  process.env.FACTORY_HOST_TIMEOUT_MS = "8000";
+  const t0 = Date.now();
+  try {
+    const ran = expectOkRun(await hostRun(grok, "loop", "pilot", tree));
+    const elapsed = Date.now() - t0;
+    expect(elapsed).toBeGreaterThan(700);
+    expect(elapsed).toBeLessThan(7000);
+    expect(ran.code).toBe(0);
+    const got = ran.stdout.split(/\r?\n/).find((l) => /PILOT_VERDICT=/.test(l));
+    expect(got).toBe(real);
+    expect(got).not.toContain("<");
+    expect(got).not.toBe(template);
     await Bun.sleep(150);
     expect(existsSync(marker)).toBe(true);
     const pid = Number(readFileSync(marker, "utf8").trim());
