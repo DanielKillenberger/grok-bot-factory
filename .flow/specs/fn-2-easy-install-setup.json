@@ -11,7 +11,8 @@
   ],
   "id": "fn-2-easy-install-setup",
   "impl_review_rounds": {
-    "fn-2-easy-install-setup.1": 0
+    "fn-2-easy-install-setup.1": 0,
+    "fn-2-easy-install-setup.2": 1
   },
   "next_task": 1,
   "plan_review_rounds": 0,
@@ -235,8 +236,18 @@
     "plan": 1,
     "plan#completion": 0
   },
-  "review_pending_rounds": {},
-  "review_reservations": {},
+  "review_pending_rounds": {
+    "impl:fn-2-easy-install-setup.2": 1
+  },
+  "review_reservations": {
+    "d32375569d204e5d91c77b4e0cd0d0f3": {
+      "artifact_sha256": "24b80796134369db329c2daea8b5c2bae8cb7156a00bcbc377294aad8351413e",
+      "counter_scope": "impl:fn-2-easy-install-setup.2",
+      "epoch": 0,
+      "forced": false,
+      "review_type": "impl"
+    }
+  },
   "review_transport_failures": {
     "impl:fn-2-easy-install-setup.1": 0,
     "plan": 0
@@ -255,5 +266,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-26T20:44:23.295367Z"
+  "updated_at": "2026-08-26T21:03:44.949776Z"
 }

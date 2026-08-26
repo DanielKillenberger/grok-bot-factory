@@ -82,6 +82,11 @@ test("refuses missing --confirmed and writes no hooks", async () => {
   expect(res.stdout.trim()).toBe("");
   expect(res.stderr).toMatch(/unconfirmed input refused/);
   expect(hookMutates()).toEqual([]);
+
+  const candidates = await runHooks(["--candidates", "acme/app"]);
+  expect(candidates.code).toBe(20);
+  expect(candidates.stderr).toMatch(/unconfirmed input refused/);
+  expect(hookMutates()).toEqual([]);
 });
 
 test("refuses positional repos without --confirmed", async () => {
@@ -148,7 +153,17 @@ test("zero matching URL POSTs web push hook; one matching URL PATCHes secret", a
   const patched = await runHooks(["--confirmed", "acme/app"], "one_match");
   expect(patched.code).toBe(0);
   expect(hookMutates().map((m) => m.method)).toEqual(["PATCH"]);
-  expect(JSON.stringify(hookMutates()[0]?.body ?? {})).toContain(senderKey);
+  const patch = hookMutates()[0]?.body as {
+    active?: boolean;
+    events?: string[];
+    config?: { secret?: string; content_type?: string; insecure_ssl?: string };
+  };
+  expect(patch.active).toBe(true);
+  expect(patch.events).toEqual(["push"]);
+  expect(patch.config?.secret).toBe(senderKey);
+  expect(patch.config?.secret).not.toBe("********");
+  expect(patch.config?.content_type).toBe("json");
+  expect(patch.config?.insecure_ssl).toBe("0");
   expect(JSON.parse(patched.stdout).succeeded).toEqual(["acme/app"]);
 });
 

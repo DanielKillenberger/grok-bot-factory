@@ -11,7 +11,7 @@ Implementing or reading this skill does not arm a production wake.
 
 ## Inputs
 
-- Instance host CLI stays instance config (fn-1, `FACTORY_HOST` / `--host`). Do not overwrite a product repo’s flow-next:setup review pin (`review.backend` and the instruction-file routing block stay).
+- Instance host CLI stays instance config (fn-1, `FACTORY_HOST` / `--host`). Do not overwrite a product repo’s flow-next:setup review pin (`review.backend` and the instruction-file routing block stay). Do not re-run `/flow-next:setup` on confirmed repos to refresh that pin.
 - Whitelist overlay is flag/env only (`--whitelist` / `FACTORY_MEMBERSHIP_WHITELIST`). There is no allowlist in this repo.
 - Routine URL and sender key come from the builder’s Routines panel (owner paste is allowed). Never write them to git.
 
@@ -55,7 +55,7 @@ Then the coordinator/tick runner with the instance host-CLI input (`FACTORY_HOST
 bun factory/tick.ts
 ```
 
-If the panel cannot exec a command before a model, stop. Do not start a model to run the gate. Do not overwrite a product repo’s flow-next:setup review pin.
+If the panel cannot exec a command before a model, stop. Do not start a model to run the gate. Do not make the gate “the first tool call.” Do not overwrite a product repo’s flow-next:setup review pin.
 
 ## 5. Mutate — only after confirm
 

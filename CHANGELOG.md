@@ -6,7 +6,6 @@
 
 - Factory runtime: deterministic GitHub-push wake gate, isolated tick runner, and stuck/owner-gated notify (builder → main → human). The builder owns the webhook routine and execs the gate before any model. Implementing this does not arm a production wake.
 - Easy-install: send this repo to main Grok Bot; after owner confirm, assign/create a builder, webhook routine (fn-1 gate command-first), and GitHub push hooks on the confirmed set. Manual hand-wire remains valid. Does not overwrite flow-next:setup review pins. Implementing this does not arm live repos.
-- Easy-install: main-agent conversation discovers `.flow/` repos, waits for confirm, then converges GitHub push hooks on the confirmed set (assign existing builder; create one only if none exists; reuse the webhook routine). Hand-wire remains valid.
 
 ### Changed
 
