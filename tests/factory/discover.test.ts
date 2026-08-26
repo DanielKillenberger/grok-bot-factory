@@ -105,7 +105,7 @@ test("named repo without .flow is reported, not skipped or inited", async () => 
 });
 
 test("malformed owner/name fails closed", async () => {
-  for (const name of ["acme/app/typo", "acme/", "/app", "noslash"]) {
+  for (const name of ["acme/app/typo", "acme/", "/app", "noslash", "acme/app?", "acme/..", "acme/."]) {
     const res = await runDiscover(["--named", name]);
     expect(res.code, name).toBe(20);
     expect(res.stdout.trim(), name).toBe("");

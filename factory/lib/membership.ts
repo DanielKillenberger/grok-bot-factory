@@ -1,4 +1,5 @@
 import { gh } from "./gh.ts";
+import { isRepoFullName } from "./github_push.ts";
 
 const ENTRY_TYPES = new Set(["file", "dir", "symlink", "submodule"]);
 
@@ -28,13 +29,7 @@ function isContentsListing(body: string): boolean {
 
 export type MemberResult = "member" | "quiet" | "stuck";
 
-/** Exactly one `owner/name` pair; extra slashes or blanks fail closed. */
-export function isRepoFullName(s: string): boolean {
-  const parts = s.split("/");
-  if (parts.length !== 2) return false;
-  const [owner, repo] = parts;
-  return owner.length > 0 && repo.length > 0 && !/\s/.test(s);
-}
+export { isRepoFullName };
 
 export async function probeFlowDir(
   fullName: string,
