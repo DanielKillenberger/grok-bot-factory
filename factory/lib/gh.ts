@@ -1,6 +1,6 @@
 import { runCmd, which } from "./cmd.ts";
 
-export type GhClass = "ok" | "404" | "403" | "429" | "5xx" | "transport";
+export type GhClass = "ok" | "401" | "404" | "403" | "429" | "5xx" | "transport";
 
 export type GhResult = {
   ok: boolean;
@@ -13,6 +13,7 @@ function classFromErr(err: string): GhClass {
   if (/HTTP 429/.test(err)) return "429";
   if (/HTTP 404/.test(err)) return "404";
   if (/HTTP 403/.test(err)) return "403";
+  if (/HTTP 401/.test(err)) return "401";
   if (/HTTP 5[0-9][0-9]/.test(err)) return "5xx";
   return "transport";
 }

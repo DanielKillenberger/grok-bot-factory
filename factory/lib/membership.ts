@@ -28,28 +28,27 @@ function isContentsListing(body: string): boolean {
 
 export type MemberResult = "member" | "quiet" | "stuck";
 
-export async function membershipCheck(
+export async function probeFlowDir(
   fullName: string,
-  after: string,
+  ref?: string,
 ): Promise<{ result: MemberResult; reason?: string }> {
-  const members = membersList();
-  if (members.length > 0) {
-    return { result: members.includes(fullName) ? "member" : "quiet" };
-  }
   const [owner, repo] = fullName.split("/");
-  const res = await gh([
+  const argv = [
     "api",
     "--method",
     "GET",
     `repos/${owner}/${repo}/contents/.flow`,
-    "-f",
-    `ref=${after}`,
-  ]);
+  ];
+  if (ref) {
+    argv.push("-f", `ref=${ref}`);
+  }
+  const res = await gh(argv);
+  const at = ref ? ` at ${ref}` : "";
   if (res.ok) {
     if (!isContentsListing(res.stdout)) {
       return {
         result: "stuck",
-        reason: `membership: malformed contents for ${fullName} .flow at ${after}`,
+        reason: `membership: malformed contents for ${fullName} .flow${at}`,
       };
     }
     return { result: "member" };
@@ -58,11 +57,22 @@ export async function membershipCheck(
   if (res.class === "403") {
     return {
       result: "stuck",
-      reason: `membership: contents 403 for ${fullName} .flow at ${after}`,
+      reason: `membership: contents 403 for ${fullName} .flow${at}`,
     };
   }
   return {
     result: "stuck",
-    reason: `membership: gh ${res.class} reading ${fullName} .flow at ${after}`,
+    reason: `membership: gh ${res.class} reading ${fullName} .flow${at}`,
   };
+}
+
+export async function membershipCheck(
+  fullName: string,
+  after: string,
+): Promise<{ result: MemberResult; reason?: string }> {
+  const members = membersList();
+  if (members.length > 0) {
+    return { result: members.includes(fullName) ? "member" : "quiet" };
+  }
+  return probeFlowDir(fullName, after);
 }
