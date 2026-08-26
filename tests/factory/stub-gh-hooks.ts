@@ -94,13 +94,14 @@ function makeHook(
   };
 }
 
+function otherUrl(i: number): string {
+  return `${"https://"}example.invalid/${"other"}/${String(i).padStart(2, "0")}`;
+}
+
 function seedMany(state: State, repo: string): StoredHook[] {
   const hooks: StoredHook[] = [];
   for (let i = 0; i < 35; i++) {
-    const url =
-      i === 34
-        ? routineUrl
-        : `${"https://"}example.invalid/${"other"}/${String(i + 1).padStart(2, "0")}`;
+    const url = i === 34 ? routineUrl : otherUrl(i + 1);
     hooks.push(makeHook(state, url, { active: i === 34 ? false : true }));
   }
   state.repos[repo] = hooks;
@@ -109,10 +110,8 @@ function seedMany(state: State, repo: string): StoredHook[] {
 
 function seedRepo(state: State, repo: string): StoredHook[] {
   if (state.repos[repo]) return state.repos[repo];
-  if (scenario === "many") {
-    return seedMany(state, repo);
-  }
-  if (scenario === "one_match") {
+  if (scenario === "many") return seedMany(state, repo);
+  if (scenario === "one" || scenario === "one_match") {
     state.repos[repo] = [
       makeHook(state, routineUrl, {
         active: false,
@@ -121,13 +120,12 @@ function seedRepo(state: State, repo: string): StoredHook[] {
     ];
     return state.repos[repo];
   }
-  if (scenario === "dup_match" || (scenario === "partial" && repo === "acme/lib")) {
+  if (scenario === "dup" || scenario === "dup_match") {
     state.repos[repo] = [makeHook(state, routineUrl), makeHook(state, routineUrl)];
     return state.repos[repo];
   }
   if (scenario === "other") {
-    const other = `${"https://"}example.invalid/${"other"}/hook`;
-    state.repos[repo] = [makeHook(state, other)];
+    state.repos[repo] = [makeHook(state, otherUrl(1))];
     return state.repos[repo];
   }
   state.repos[repo] = [];
@@ -139,7 +137,12 @@ function methodOf(): string {
   return (m ? m[1] : "GET").toUpperCase();
 }
 
-function parseTarget(): { repo: string; id: number | null; page: number; perPage: number } | null {
+function parseTarget(): {
+  repo: string;
+  id: number | null;
+  page: number;
+  perPage: number;
+} | null {
   const m = args.match(/repos\/([^/]+\/[^/?]+)\/hooks(?:\/(\d+))?(\?[^\s]*)?/);
   if (!m) return null;
   const query = m[3] ?? "";
@@ -164,8 +167,24 @@ const target = parseTarget();
 if (!target) httpErr(404, "Not Found");
 
 if (method === "GET" && target.id === null) {
-  if (scenario === "list_403") httpErr(403, "Resource not accessible by integration");
-  if (scenario === "list_500") httpErr(502, "Server Error");
+  if (
+    scenario === "get_401" ||
+    scenario === "list_401"
+  ) {
+    httpErr(401, "Bad credentials");
+  }
+  if (scenario === "get_403" || scenario === "list_403") {
+    httpErr(403, "Resource not accessible by integration");
+  }
+  if (scenario === "get_429" || scenario === "list_429") {
+    httpErr(429, "API rate limit exceeded");
+  }
+  if (scenario === "get_500" || scenario === "list_500") {
+    httpErr(502, "Server Error");
+  }
+  if (scenario === "partial" && target.repo === "acme/fail") {
+    httpErr(500, "Server Error");
+  }
   if (scenario === "malformed") {
     process.stdout.write("{not-json\n");
     process.exit(0);
@@ -173,8 +192,22 @@ if (method === "GET" && target.id === null) {
   const state = loadState();
   const hooks = seedRepo(state, target.repo);
   saveState(state);
+  const views = hooks.map(hookView);
+  if (args.includes("--paginate")) {
+    const pages: StoredHook[][] = [];
+    for (let i = 0; i < views.length; i += target.perPage) {
+      pages.push(views.slice(i, i + target.perPage));
+    }
+    if (pages.length === 0) pages.push([]);
+    if (args.includes("--slurp")) {
+      process.stdout.write(`${JSON.stringify(pages)}\n`);
+    } else {
+      process.stdout.write(`${JSON.stringify(pages.flat())}\n`);
+    }
+    process.exit(0);
+  }
   const start = (target.page - 1) * target.perPage;
-  const slice = hooks.slice(start, start + target.perPage).map(hookView);
+  const slice = views.slice(start, start + target.perPage);
   process.stdout.write(`${JSON.stringify(slice)}\n`);
   process.exit(0);
 }
@@ -182,6 +215,7 @@ if (method === "GET" && target.id === null) {
 let raw = "";
 if (args.includes("--input")) {
   raw = await Bun.stdin.text();
+  appendFileSync(`${log}.body`, raw.endsWith("\n") ? raw : `${raw}\n`);
 }
 let body: unknown = {};
 if (raw) {
@@ -207,7 +241,12 @@ if (method === "POST" && target.id === null) {
     name?: unknown;
     active?: unknown;
     events?: unknown;
-    config?: { url?: unknown; content_type?: unknown; secret?: unknown; insecure_ssl?: unknown };
+    config?: {
+      url?: unknown;
+      content_type?: unknown;
+      secret?: unknown;
+      insecure_ssl?: unknown;
+    };
   };
   const url = typeof rec.config?.url === "string" ? rec.config.url : "";
   const hook = makeHook(state, url, {
@@ -216,9 +255,11 @@ if (method === "POST" && target.id === null) {
     events: Array.isArray(rec.events) ? (rec.events as string[]) : ["push"],
     config: {
       url,
-      content_type: typeof rec.config?.content_type === "string" ? rec.config.content_type : "json",
+      content_type:
+        typeof rec.config?.content_type === "string" ? rec.config.content_type : "json",
       secret: typeof rec.config?.secret === "string" ? rec.config.secret : "",
-      insecure_ssl: typeof rec.config?.insecure_ssl === "string" ? rec.config.insecure_ssl : "0",
+      insecure_ssl:
+        typeof rec.config?.insecure_ssl === "string" ? rec.config.insecure_ssl : "0",
     },
   });
   state.repos[target.repo] = [...(state.repos[target.repo] ?? []), hook];
@@ -239,7 +280,12 @@ if (method === "PATCH" && target.id !== null) {
   const rec = body as {
     active?: unknown;
     events?: unknown;
-    config?: { url?: unknown; content_type?: unknown; secret?: unknown; insecure_ssl?: unknown };
+    config?: {
+      url?: unknown;
+      content_type?: unknown;
+      secret?: unknown;
+      insecure_ssl?: unknown;
+    };
   };
   const prev = hooks[idx];
   const url = typeof rec.config?.url === "string" ? rec.config.url : prev.config.url;
@@ -249,9 +295,15 @@ if (method === "PATCH" && target.id !== null) {
     events: Array.isArray(rec.events) ? (rec.events as string[]) : prev.events,
     config: {
       url,
-      content_type: typeof rec.config?.content_type === "string" ? rec.config.content_type : prev.config.content_type,
+      content_type:
+        typeof rec.config?.content_type === "string"
+          ? rec.config.content_type
+          : prev.config.content_type,
       secret: typeof rec.config?.secret === "string" ? rec.config.secret : prev.config.secret,
-      insecure_ssl: typeof rec.config?.insecure_ssl === "string" ? rec.config.insecure_ssl : prev.config.insecure_ssl,
+      insecure_ssl:
+        typeof rec.config?.insecure_ssl === "string"
+          ? rec.config.insecure_ssl
+          : prev.config.insecure_ssl,
     },
   };
   hooks[idx] = updated;

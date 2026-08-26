@@ -1,28 +1,32 @@
 #!/usr/bin/env bun
 import { parseArgs } from "./lib/args.ts";
-import { runCli, stuck } from "./lib/exit.ts";
+import { FactoryExit, EXIT_STUCK, runCli, stuck } from "./lib/exit.ts";
 import { gh } from "./lib/gh.ts";
 import { isRepoFullName } from "./lib/membership.ts";
 
-const ALLOWED = new Set(["confirmed", "host", "candidates"]);
-const PAGE = 30;
-const PAGE_CAP = 10_000;
+const ALLOWED = new Set([
+  "confirmed",
+  "candidates",
+  "builder-exists",
+  "create-routine",
+  "routine-url",
+  "sender-key",
+  "host",
+]);
 
-export type RoutineWiring = {
-  type: "webhook";
-  first_action: "exec";
-  command: "bun factory/gate.ts";
-  model: false;
-  then: "coordinator/tick";
-  host_cli: string;
-  pin: "preserve";
-};
+export const ROUTINE_FIRST_ACTION = "bun factory/gate.ts";
+export const ROUTINE_COORDINATOR = "bun factory/tick.ts";
 
 export type HookFailure = { repo: string; reason: string };
 
 export type HooksReport = {
-  builder: "assign-existing-or-create-if-none";
-  routine: RoutineWiring;
+  builder: "assign-existing" | "create-if-none";
+  routine: "reuse" | "create";
+  routine_first_action: typeof ROUTINE_FIRST_ACTION;
+  coordinator: typeof ROUTINE_COORDINATOR;
+  model_first: false;
+  host: string;
+  pin: "keep";
   succeeded: string[];
   failed: HookFailure[];
 };
@@ -45,20 +49,21 @@ function uniqueNames(names: string[]): string[] {
   return out;
 }
 
-export function routineWiring(hostCli: string): RoutineWiring {
-  return {
-    type: "webhook",
-    first_action: "exec",
-    command: "bun factory/gate.ts",
-    model: false,
-    then: "coordinator/tick",
-    host_cli: hostCli || "instance",
-    pin: "preserve",
-  };
+function looksUnconfirmed(raw: string): boolean {
+  const t = raw.trim();
+  if (!t.startsWith("{") && !t.startsWith("[")) return false;
+  try {
+    const data = JSON.parse(t) as unknown;
+    if (Array.isArray(data)) return true;
+    if (typeof data === "object" && data !== null && "candidates" in data) return true;
+  } catch {
+    return true;
+  }
+  return true;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
+  return typeof v === "object" && v !== null && Array.isArray(v) === false;
 }
 
 function desiredBody(url: string, secret: string, kind: "post" | "patch"): string {
@@ -91,8 +96,9 @@ function parseHooks(stdout: string): HookRow[] | undefined {
     return undefined;
   }
   if (!Array.isArray(data)) return undefined;
+  const items: unknown[] = data.every((x) => Array.isArray(x)) ? data.flat() : data;
   const rows: HookRow[] = [];
-  for (const item of data) {
+  for (const item of items) {
     if (!isRecord(item)) return undefined;
     if (typeof item.id !== "number" || !Number.isInteger(item.id)) return undefined;
     let url = "";
@@ -106,25 +112,22 @@ function parseHooks(stdout: string): HookRow[] | undefined {
 
 async function listHooks(fullName: string): Promise<HookRow[] | { reason: string }> {
   const [owner, repo] = fullName.split("/");
-  const all: HookRow[] = [];
-  for (let page = 1, limit = PAGE; limit <= PAGE_CAP; page += 1, limit += PAGE) {
-    const res = await gh([
-      "api",
-      "--method",
-      "GET",
-      `repos/${owner}/${repo}/hooks?per_page=${PAGE}&page=${page}`,
-    ]);
-    if (!res.ok) {
-      return { reason: `gh ${res.class} listing hooks on ${fullName}` };
-    }
-    const parsed = parseHooks(res.stdout);
-    if (parsed === undefined) {
-      return { reason: `malformed hook list on ${fullName}` };
-    }
-    all.push(...parsed);
-    if (parsed.length < PAGE) return all;
+  const res = await gh([
+    "api",
+    "--paginate",
+    "--slurp",
+    "--method",
+    "GET",
+    `repos/${owner}/${repo}/hooks?per_page=30`,
+  ]);
+  if (!res.ok) {
+    return { reason: `gh ${res.class} listing hooks on ${fullName}` };
   }
-  return all;
+  const parsed = parseHooks(res.stdout);
+  if (parsed === undefined) {
+    return { reason: `malformed hook list on ${fullName}` };
+  }
+  return parsed;
 }
 
 async function postHook(
@@ -149,14 +152,7 @@ async function patchHook(
 ): Promise<{ ok: true } | { reason: string }> {
   const [owner, repo] = fullName.split("/");
   const res = await gh(
-    [
-      "api",
-      "--method",
-      "PATCH",
-      `repos/${owner}/${repo}/hooks/${id}`,
-      "--input",
-      "-",
-    ],
+    ["api", "--method", "PATCH", `repos/${owner}/${repo}/hooks/${id}`, "--input", "-"],
     { stdin: desiredBody(url, secret, "patch") },
   );
   if (res.ok) return { ok: true };
@@ -175,7 +171,7 @@ async function convergeListed(
 ): Promise<{ ok: true } | { reason: string }> {
   const found = matches(rows, url);
   if (found.length >= 2) {
-    return { reason: `duplicate webhook URL on ${fullName}` };
+    return { reason: "ambiguous hooks" };
   }
   if (found.length === 1) {
     // GitHub GET redacts secret as ********; URL match is not identity.
@@ -193,7 +189,7 @@ async function convergeRepo(
   if ("reason" in listed) return listed;
   const found = matches(listed, url);
   if (found.length >= 2) {
-    return { reason: `duplicate webhook URL on ${fullName}` };
+    return { reason: "ambiguous hooks" };
   }
   if (found.length === 1) {
     return patchHook(fullName, found[0].id, url, secret);
@@ -208,29 +204,54 @@ async function convergeRepo(
   return { reason: posted.reason };
 }
 
+function resolveBuilder(flags: Map<string, string>): HooksReport["builder"] {
+  const exists = flags.get("builder-exists") ?? "1";
+  return exists === "0" ? "create-if-none" : "assign-existing";
+}
+
+function resolveRoutine(flags: Map<string, string>): HooksReport["routine"] {
+  const create = flags.has("create-routine");
+  const panel = (process.env.FACTORY_PANEL_ROUTINE ?? "").trim();
+  if (panel === "webhook" && create) {
+    stuck("webhook routine exists; do not mint a second");
+  }
+  return create ? "create" : "reuse";
+}
+
 export async function runHooks(argv: string[]): Promise<HooksReport> {
   const { flags, rest } = parseArgs(argv, ALLOWED);
-  if (rest.length > 0 || flags.has("candidates") || !flags.has("confirmed")) {
+  if (rest.length > 0 || flags.has("candidates")) {
+    stuck("unconfirmed input refused");
+  }
+  if (!flags.has("confirmed")) {
+    stuck("--confirmed is required");
+  }
+  const rawConfirmed = flags.get("confirmed") ?? "";
+  if (looksUnconfirmed(rawConfirmed)) {
     stuck("unconfirmed input refused");
   }
 
-  const confirmed = uniqueNames(splitNames(flags.get("confirmed")));
-  if (confirmed.length === 0) stuck("unconfirmed input refused");
+  const confirmed = uniqueNames(splitNames(rawConfirmed));
   for (const n of confirmed) {
     if (!isRepoFullName(n)) stuck(`hooks: invalid repo name ${n}`);
   }
 
-  const url = (process.env.FACTORY_ROUTINE_URL ?? "").trim();
-  const secret = (process.env.FACTORY_SENDER_KEY ?? "").trim();
-  if (!url || !secret) stuck("hooks: missing routine URL or sender key");
+  const url = (flags.get("routine-url") ?? process.env.FACTORY_ROUTINE_URL ?? "").trim();
+  const secret = (flags.get("sender-key") ?? process.env.FACTORY_SENDER_KEY ?? "").trim();
+  if (!url || !secret) stuck("routine URL and sender key are required");
   if (url.includes("\n") || url.includes("\r") || secret.includes("\n") || secret.includes("\r")) {
-    stuck("hooks: missing routine URL or sender key");
+    stuck("routine URL and sender key are required");
   }
 
   const hostCli = (flags.get("host") ?? process.env.FACTORY_HOST ?? "").trim();
   const report: HooksReport = {
-    builder: "assign-existing-or-create-if-none",
-    routine: routineWiring(hostCli),
+    builder: resolveBuilder(flags),
+    routine: resolveRoutine(flags),
+    routine_first_action: ROUTINE_FIRST_ACTION,
+    coordinator: ROUTINE_COORDINATOR,
+    model_first: false,
+    host: hostCli,
+    pin: "keep",
     succeeded: [],
     failed: [],
   };
@@ -246,9 +267,10 @@ export async function runHooks(argv: string[]): Promise<HooksReport> {
 if (import.meta.main) {
   await runCli(async () => {
     const report = await runHooks(process.argv.slice(2));
-    process.stdout.write(`${JSON.stringify(report)}\n`);
+    const json = `${JSON.stringify(report)}\n`;
+    process.stdout.write(json);
     if (report.failed.length > 0) {
-      stuck(`hooks: ${report.failed.length} repo(s) failed`);
+      throw new FactoryExit(EXIT_STUCK, `hooks: ${report.failed.length} repo(s) failed`);
     }
   });
 }

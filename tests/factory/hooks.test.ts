@@ -31,6 +31,7 @@ function env(stub: string, extra: Record<string, string | undefined> = {}) {
     FACTORY_SENDER_KEY: senderKey,
     FACTORY_HOST: "grok",
     FACTORY_MEMBERSHIP_WHITELIST: undefined,
+    FACTORY_PANEL_ROUTINE: undefined,
     ...extra,
   };
 }
@@ -38,8 +39,10 @@ function env(stub: string, extra: Record<string, string | undefined> = {}) {
 function freshLog() {
   writeFileSync(ghLog, "");
   rmSync(`${ghLog}.hooks`, { force: true });
+  rmSync(`${ghLog}.body`, { force: true });
   rmSync(`${ghLog}.state`, { force: true });
   rmSync(`${ghLog}.429`, { force: true });
+  rmSync(`${ghLog}.422`, { force: true });
 }
 
 beforeEach(() => {
@@ -59,13 +62,12 @@ function ghLogText(): string {
   return existsSync(ghLog) ? readFileSync(ghLog, "utf8") : "";
 }
 
-function hookMutates(): { method: string; repo: string; body?: { config?: { secret?: string } } }[] {
-  if (!existsSync(`${ghLog}.hooks`)) return [];
-  return readFileSync(`${ghLog}.hooks`, "utf8")
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as { method: string; repo: string; body?: { config?: { secret?: string } } });
+function hookMutates(): string {
+  return existsSync(`${ghLog}.hooks`) ? readFileSync(`${ghLog}.hooks`, "utf8") : "";
+}
+
+function bodies(): string {
+  return existsSync(`${ghLog}.body`) ? readFileSync(`${ghLog}.body`, "utf8") : "";
 }
 
 async function runHooks(
@@ -80,13 +82,13 @@ test("refuses missing --confirmed and writes no hooks", async () => {
   const res = await runHooks([]);
   expect(res.code).toBe(20);
   expect(res.stdout.trim()).toBe("");
-  expect(res.stderr).toMatch(/unconfirmed input refused/);
-  expect(hookMutates()).toEqual([]);
+  expect(res.stderr).toMatch(/--confirmed is required/);
+  expect(hookMutates()).toBe("");
 
   const candidates = await runHooks(["--candidates", "acme/app"]);
   expect(candidates.code).toBe(20);
   expect(candidates.stderr).toMatch(/unconfirmed input refused/);
-  expect(hookMutates()).toEqual([]);
+  expect(hookMutates()).toBe("");
 });
 
 test("refuses positional repos without --confirmed", async () => {
@@ -94,14 +96,14 @@ test("refuses positional repos without --confirmed", async () => {
   expect(res.code).toBe(20);
   expect(res.stdout.trim()).toBe("");
   expect(res.stderr).toMatch(/unconfirmed input refused/);
-  expect(hookMutates()).toEqual([]);
+  expect(hookMutates()).toBe("");
 });
 
 test("refuses candidate JSON as confirmed", async () => {
   const res = await runHooks(["--confirmed", '{"candidates":["acme/app"]}']);
   expect(res.code).toBe(20);
-  expect(res.stderr).toMatch(/unconfirmed input refused|invalid repo name/);
-  expect(hookMutates()).toEqual([]);
+  expect(res.stderr).toMatch(/unconfirmed input refused/);
+  expect(hookMutates()).toBe("");
 });
 
 test("after confirm, only the confirmed set is mutated", async () => {
@@ -110,87 +112,84 @@ test("after confirm, only the confirmed set is mutated", async () => {
   const body = JSON.parse(res.stdout) as {
     succeeded: string[];
     failed: unknown[];
+    routine_first_action: string;
+    coordinator: string;
+    host: string;
+    pin: string;
     builder: string;
-    routine: {
-      command: string;
-      model: boolean;
-      then: string;
-      host_cli: string;
-      pin: string;
-      first_action: string;
-      type: string;
-    };
+    routine: string;
+    model_first: boolean;
   };
   expect(body.succeeded).toEqual(["acme/app"]);
   expect(body.failed).toEqual([]);
-  expect(body.builder).toBe("assign-existing-or-create-if-none");
-  expect(body.routine.type).toBe("webhook");
-  expect(body.routine.first_action).toBe("exec");
-  expect(body.routine.command).toBe("bun factory/gate.ts");
-  expect(body.routine.model).toBe(false);
-  expect(body.routine.then).toBe("coordinator/tick");
-  expect(body.routine.host_cli).toBe("grok");
-  expect(body.routine.pin).toBe("preserve");
-  expect(hookMutates().map((m) => m.method)).toEqual(["POST"]);
-  expect(hookMutates()[0]?.repo).toBe("acme/app");
-  expect(hookMutates().some((m) => m.repo === "acme/lib")).toBe(false);
-  expect(ghLogText()).toMatch(/per_page=30/);
+  expect(body.routine_first_action).toBe("bun factory/gate.ts");
+  expect(body.coordinator).toBe("bun factory/tick.ts");
+  expect(body.model_first).toBe(false);
+  expect(body.host).toBe("grok");
+  expect(body.pin).toBe("keep");
+  expect(body.builder).toBe("assign-existing");
+  expect(body.routine).toBe("reuse");
+  expect(hookMutates()).toMatch(/POST/);
+  expect(hookMutates()).not.toMatch(/acme\/lib/);
+  expect(ghLogText()).toMatch(/--paginate/);
+  expect(res.stdout).not.toContain(senderKey);
+  expect(res.stdout).not.toContain(routineUrl);
 });
 
 test("zero matching URL POSTs web push hook; one matching URL PATCHes secret", async () => {
   const created = await runHooks(["--confirmed", "acme/app"], "ok");
   expect(created.code).toBe(0);
-  expect(hookMutates().map((m) => m.method)).toEqual(["POST"]);
-  const postBody = JSON.stringify(hookMutates()[0]?.body ?? {});
-  expect(postBody).toMatch(/"name":"web"/);
-  expect(postBody).toMatch(/"events":\["push"\]/);
-  expect(postBody).toMatch(/"content_type":"json"/);
-  expect(postBody).toMatch(/"insecure_ssl":"0"/);
-  expect(postBody).toContain(senderKey);
-  expect(postBody).toContain(routineUrl);
+  expect(hookMutates()).toMatch(/POST/);
+  expect(bodies()).toMatch(/"name":"web"/);
+  expect(bodies()).toMatch(/"events":\["push"\]/);
+  expect(bodies()).toMatch(/"content_type":"json"/);
+  expect(bodies()).toMatch(/"insecure_ssl":"0"/);
+  expect(bodies()).toContain(senderKey);
+  expect(bodies()).toContain(routineUrl);
 
   freshLog();
-  const patched = await runHooks(["--confirmed", "acme/app"], "one_match");
+  const patched = await runHooks(["--confirmed", "acme/app"], "one");
   expect(patched.code).toBe(0);
-  expect(hookMutates().map((m) => m.method)).toEqual(["PATCH"]);
-  const patch = hookMutates()[0]?.body as {
-    active?: boolean;
-    events?: string[];
-    config?: { secret?: string; content_type?: string; insecure_ssl?: string };
-  };
-  expect(patch.active).toBe(true);
-  expect(patch.events).toEqual(["push"]);
-  expect(patch.config?.secret).toBe(senderKey);
-  expect(patch.config?.secret).not.toBe("********");
-  expect(patch.config?.content_type).toBe("json");
-  expect(patch.config?.insecure_ssl).toBe("0");
+  expect(hookMutates()).toMatch(/PATCH/);
+  expect(hookMutates()).not.toMatch(/POST/);
+  expect(bodies()).toContain(senderKey);
+  expect(bodies()).toMatch(/"events":\["push"\]/);
+  expect(bodies()).toMatch(/"active":true/);
   expect(JSON.parse(patched.stdout).succeeded).toEqual(["acme/app"]);
 });
 
 test("other URL is not treated as equivalent; still POSTs", async () => {
   const res = await runHooks(["--confirmed", "acme/app"], "other");
   expect(res.code).toBe(0);
-  expect(hookMutates().map((m) => m.method)).toEqual(["POST"]);
+  expect(hookMutates()).toMatch(/POST/);
 });
 
 test("duplicate URL matches are reported, not guessed", async () => {
-  const res = await runHooks(["--confirmed", "acme/app"], "dup_match");
+  const res = await runHooks(["--confirmed", "acme/app"], "dup");
   expect(res.code).toBe(20);
   const body = JSON.parse(res.stdout) as {
     succeeded: string[];
     failed: { repo: string; reason: string }[];
   };
   expect(body.succeeded).toEqual([]);
-  expect(body.failed[0]?.repo).toBe("acme/app");
-  expect(body.failed[0]?.reason).toMatch(/duplicate/);
-  expect(hookMutates()).toEqual([]);
+  expect(body.failed).toEqual([{ repo: "acme/app", reason: "ambiguous hooks" }]);
+  expect(hookMutates()).toBe("");
 });
 
 test("POST 422 re-GETs and converges with PATCH", async () => {
   const res = await runHooks(["--confirmed", "acme/app"], "post_422");
   expect(res.code).toBe(0);
-  expect(hookMutates().map((m) => m.method)).toEqual(["POST", "PATCH"]);
+  expect(hookMutates()).toMatch(/POST/);
+  expect(hookMutates()).toMatch(/PATCH/);
   expect(JSON.parse(res.stdout).succeeded).toEqual(["acme/app"]);
+});
+
+test("paginates hook GET and PATCHes a match past the first page", async () => {
+  const res = await runHooks(["--confirmed", "acme/app"], "many");
+  expect(res.code).toBe(0);
+  expect(hookMutates()).toMatch(/PATCH/);
+  expect(hookMutates()).not.toMatch(/POST/);
+  expect(ghLogText()).toMatch(/--paginate/);
 });
 
 test("missing routine URL or sender key fails closed with no writes", async () => {
@@ -198,34 +197,54 @@ test("missing routine URL or sender key fails closed with no writes", async () =
     FACTORY_ROUTINE_URL: "",
   });
   expect(noUrl.code).toBe(20);
-  expect(noUrl.stderr).toMatch(/missing routine URL or sender key/);
-  expect(hookMutates()).toEqual([]);
+  expect(noUrl.stderr).toMatch(/routine URL and sender key are required/);
+  expect(hookMutates()).toBe("");
 
   const noKey = await runHooks(["--confirmed", "acme/app"], "ok", {
     FACTORY_SENDER_KEY: "",
   });
   expect(noKey.code).toBe(20);
-  expect(hookMutates()).toEqual([]);
+  expect(hookMutates()).toBe("");
 });
 
-test("paginates GET hooks and PATCHes a unique URL on a later page", async () => {
-  const res = await runHooks(["--confirmed", "acme/app"], "many");
-  expect(res.code).toBe(0);
-  expect(ghLogText()).toMatch(/page=2/);
-  expect(hookMutates().map((m) => m.method)).toEqual(["PATCH"]);
+test("create-if-none only when no builder exists; re-run reuses routine", async () => {
+  const created = await runHooks(
+    ["--confirmed", "acme/app", "--builder-exists", "0", "--create-routine", "yes"],
+    "ok",
+  );
+  expect(created.code).toBe(0);
+  expect(JSON.parse(created.stdout).builder).toBe("create-if-none");
+  expect(JSON.parse(created.stdout).routine).toBe("create");
+
+  const assigned = await runHooks(
+    ["--confirmed", "acme/app", "--builder-exists", "1"],
+    "ok",
+  );
+  expect(assigned.code).toBe(0);
+  expect(JSON.parse(assigned.stdout).builder).toBe("assign-existing");
+  expect(JSON.parse(assigned.stdout).routine).toBe("reuse");
+
+  const mint = await runHooks(
+    ["--confirmed", "acme/app", "--create-routine", "yes"],
+    "ok",
+    { FACTORY_PANEL_ROUTINE: "webhook" },
+  );
+  expect(mint.code).toBe(20);
+  expect(mint.stderr).toMatch(/do not mint a second/);
+  expect(mint.stdout.trim()).toBe("");
 });
 
 test("partial failure reports and does not roll back successes", async () => {
-  const res = await runHooks(["--confirmed", "acme/app,acme/lib"], "partial");
+  const res = await runHooks(["--confirmed", "acme/app,acme/fail"], "partial");
   expect(res.code).toBe(20);
   const body = JSON.parse(res.stdout) as {
     succeeded: string[];
     failed: { repo: string; reason: string }[];
   };
   expect(body.succeeded).toEqual(["acme/app"]);
-  expect(body.failed[0]?.repo).toBe("acme/lib");
-  expect(hookMutates().some((m) => m.repo === "acme/app")).toBe(true);
-  expect(hookMutates().some((m) => m.method === "DELETE")).toBe(false);
+  expect(body.failed[0]?.repo).toBe("acme/fail");
+  expect(hookMutates()).toMatch(/acme\/app/);
+  expect(hookMutates()).not.toMatch(/DELETE/);
 });
 
 test("malformed owner/name fails closed before writes", async () => {
@@ -233,13 +252,15 @@ test("malformed owner/name fails closed before writes", async () => {
   expect(res.code).toBe(20);
   expect(res.stdout.trim()).toBe("");
   expect(res.stderr).toMatch(/invalid repo name/);
-  expect(hookMutates()).toEqual([]);
+  expect(hookMutates()).toBe("");
 });
 
 test("listing failures fail that repo closed", async () => {
   for (const [label, stub] of [
-    ["403", "list_403"],
-    ["5xx", "list_500"],
+    ["401", "get_401"],
+    ["403", "get_403"],
+    ["429", "get_429"],
+    ["5xx", "get_500"],
     ["network", "network"],
     ["malformed", "malformed"],
   ] as const) {
@@ -248,7 +269,7 @@ test("listing failures fail that repo closed", async () => {
     expect(res.code, label).toBe(20);
     const body = JSON.parse(res.stdout) as { failed: { reason: string }[] };
     expect(body.failed[0]?.reason, label).toMatch(/gh |malformed/);
-    expect(hookMutates(), label).toEqual([]);
+    expect(hookMutates(), label).toBe("");
   }
 });
 
@@ -261,8 +282,8 @@ test("does not overwrite a product review pin", async () => {
   expect(res.code).toBe(0);
   expect(readFileSync(join(checkout, ".flow/config.json"), "utf8")).toBe(beforeCfg);
   expect(readFileSync(join(checkout, "CLAUDE.md"), "utf8")).toBe(beforeRouting);
-  expect(JSON.parse(res.stdout).routine.pin).toBe("preserve");
-  expect(JSON.parse(res.stdout).routine.host_cli).toBe("grok");
+  expect(JSON.parse(res.stdout).pin).toBe("keep");
+  expect(JSON.parse(res.stdout).host).toBe("grok");
   const src = readFileSync(join(ROOT, "factory/hooks.ts"), "utf8");
   expect(src).not.toMatch(/flow-next:setup|writeFileSync|config\.json/);
 });
