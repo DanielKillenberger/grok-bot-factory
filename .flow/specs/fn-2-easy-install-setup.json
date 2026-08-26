@@ -12,7 +12,7 @@
   "id": "fn-2-easy-install-setup",
   "impl_review_rounds": {
     "fn-2-easy-install-setup.1": 0,
-    "fn-2-easy-install-setup.2": 1
+    "fn-2-easy-install-setup.2": 0
   },
   "next_task": 1,
   "plan_review_rounds": 0,
@@ -229,10 +229,39 @@
       "task": "fn-2-easy-install-setup.1",
       "timestamp": "2026-08-26T20:44:23.293124Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "24b80796134369db329c2daea8b5c2bae8cb7156a00bcbc377294aad8351413e",
+      "backend": "cursor",
+      "base_sha": "4f3348be3492a40636ca4bc34d9e8de363f5d345",
+      "counter_kind": "impl",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d0da8be9b8c7c0602b0433d4f04a40a74167b4c3",
+      "head_sha_observed": true,
+      "kind": "impl",
+      "model": "gpt-5.6-sol-high",
+      "outcome": "verdict",
+      "output_bytes": 903,
+      "output_sha256": "edd530dda9d3cfd13995c3a4faaa3c52967e69d7c6860c79fafac3bdee2b22dd",
+      "reservation_id": "d32375569d204e5d91c77b4e0cd0d0f3",
+      "round_consumed": true,
+      "scope": "impl:fn-2-easy-install-setup.2",
+      "superseded_by": null,
+      "task": "fn-2-easy-install-setup.2",
+      "timestamp": "2026-08-26T21:06:55.159890Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:fn-2-easy-install-setup.1": 1,
+    "impl:fn-2-easy-install-setup.2": 1,
     "plan": 1,
     "plan#completion": 0
   },
@@ -240,16 +269,19 @@
     "impl:fn-2-easy-install-setup.2": 1
   },
   "review_reservations": {
-    "d32375569d204e5d91c77b4e0cd0d0f3": {
-      "artifact_sha256": "24b80796134369db329c2daea8b5c2bae8cb7156a00bcbc377294aad8351413e",
+    "95e75787dbb04654bf3d180fa452d946": {
+      "artifact_sha256": "91ac8311da9ee966185389761520fc2f2ab869032ea7095144acda8d233626a0",
       "counter_scope": "impl:fn-2-easy-install-setup.2",
       "epoch": 0,
       "forced": false,
-      "review_type": "impl"
+      "review_type": "impl",
+      "superseded_by": "d32375569d204e5d91c77b4e0cd0d0f3",
+      "superseded_epoch": 1
     }
   },
   "review_transport_failures": {
     "impl:fn-2-easy-install-setup.1": 0,
+    "impl:fn-2-easy-install-setup.2": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/fn-2-easy-install-setup.md",
@@ -266,5 +298,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-26T21:03:44.949776Z"
+  "updated_at": "2026-08-26T21:06:55.161886Z"
 }

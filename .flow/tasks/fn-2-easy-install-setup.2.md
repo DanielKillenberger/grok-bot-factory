@@ -57,9 +57,11 @@ Mutate path after confirm: assign/create builder, webhook routine that runs fn-1
 - [ ] `tests/factory/hooks.test.sh` passes
 
 ## Done summary
-TBD
+Builder/routine/push-hook mutate path: `factory/hooks.ts` accepts only an owner-confirmed `owner/name` list, converges GitHub push webhooks (POST / PATCH with current sender key, report duplicates, POST 422 re-GET), and reports gate-first routine wiring plus instance host CLI without writing review pins or secrets.
 
+stage: impl-review - ran [2026-08-26T21:05:00Z..2026-08-26T21:06:55Z] (model: gpt-5.6-sol-high)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: d0da8be9b8c7c0602b0433d4f04a40a74167b4c3, 99adf14f4a59496cec66fbbb138b4b718d05db28, a40d8ca7f18dee4ac37ed139e7dd46d0ee0f41ac
+- Tests: bun test, tests/factory/hooks.test.sh, tests/factory/secrets.test.sh
 - PRs:
+stage: plan-sync - skipped(config: planSync.enabled != true)
