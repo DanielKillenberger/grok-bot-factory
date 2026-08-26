@@ -258,7 +258,7 @@ export async function runTick(argv: string[]): Promise<void> {
       }
     }
 
-    if (verdict === "NO_WORK") {
+    if (verdict === "NO_WORK" || verdict === "ADVANCED") {
       tickLog(tick, "verdict", { host_verdict: verdict });
       quiet();
     }
