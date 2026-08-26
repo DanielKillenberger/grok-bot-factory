@@ -1159,7 +1159,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/fn-1-grok-bot-factory.md",
-  "status": "open",
+  "status": "done",
   "title": "Grok Bot factory",
   "tracker": {
     "baseHashFlow": null,
@@ -1172,5 +1172,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-23T23:13:20.737172Z"
+  "updated_at": "2026-08-26T20:28:42.426366Z"
 }
