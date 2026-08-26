@@ -81,6 +81,14 @@ test("lists .flow candidates via gh without clone and skips repos without .flow"
   noHooks("happy path");
 });
 
+test("pagination cap fails closed instead of a silent partial list", async () => {
+  const res = await runDiscover([], "list_full", { FACTORY_DISCOVER_PAGE_CAP: "100" });
+  expect(res.code).toBe(20);
+  expect(res.stdout.trim()).toBe("");
+  expect(res.stderr).toMatch(/incomplete/);
+  noHooks("cap");
+});
+
 test("paginates past the 30-repo default", async () => {
   const res = await runDiscover([], "many");
   expect(res.code).toBe(0);

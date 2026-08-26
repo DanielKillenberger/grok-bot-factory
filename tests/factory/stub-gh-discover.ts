@@ -79,6 +79,11 @@ if (args.includes("repo list")) {
     repoList(many);
     process.exit(0);
   }
+  if (scenario === "list_full") {
+    const n = limitFromArgs();
+    repoList(Array.from({ length: n }, (_, i) => `acme/r${String(i + 1).padStart(5, "0")}`));
+    process.exit(0);
+  }
   repoList(okNames);
   process.exit(0);
 }

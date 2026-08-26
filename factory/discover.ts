@@ -6,7 +6,13 @@ import { isRepoFullName, probeFlowDir } from "./lib/membership.ts";
 
 const ALLOWED = new Set(["whitelist", "owner", "named"]);
 const PAGE = 100;
-const PAGE_CAP = 10_000;
+const DEFAULT_PAGE_CAP = 10_000;
+
+function pageCap(): number {
+  const raw = process.env.FACTORY_DISCOVER_PAGE_CAP;
+  if (raw && /^[1-9][0-9]*$/.test(raw)) return Number(raw);
+  return DEFAULT_PAGE_CAP;
+}
 
 export type DiscoverResult = {
   candidates: string[];
@@ -41,9 +47,10 @@ function parseRepoList(stdout: string): string[] | undefined {
 }
 
 async function listRepos(owner: string | undefined): Promise<string[]> {
+  const cap = pageCap();
   let limit = PAGE;
   let names: string[] = [];
-  while (limit <= PAGE_CAP) {
+  while (limit <= cap) {
     const argv = ["repo", "list"];
     if (owner) argv.push(owner);
     argv.push("--limit", String(limit), "--json", "nameWithOwner");
@@ -57,9 +64,10 @@ async function listRepos(owner: string | undefined): Promise<string[]> {
     }
     names = parsed;
     if (names.length < limit) return names;
+    if (limit >= cap) stuck("discover: repo list incomplete");
     limit += PAGE;
   }
-  return names;
+  stuck("discover: repo list incomplete");
 }
 
 export async function runDiscover(argv: string[]): Promise<DiscoverResult> {

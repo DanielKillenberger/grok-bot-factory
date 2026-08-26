@@ -1,7 +1,7 @@
 {
   "branch_name": "fn-2-easy-install-setup",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "needs_work",
+  "completion_reviewed_at": "2026-08-26T21:14:46.890234Z",
   "created_at": "2026-08-23T20:51:08.195421Z",
   "default_impl": null,
   "default_review": null,
@@ -15,7 +15,7 @@
     "fn-2-easy-install-setup.2": 0
   },
   "next_task": 1,
-  "plan_review_rounds": 0,
+  "plan_review_rounds": 1,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-08-23T21:39:37.372995Z",
   "ready": true,
@@ -257,6 +257,49 @@
       "task": "fn-2-easy-install-setup.2",
       "timestamp": "2026-08-26T21:06:55.159890Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "3c0fc7119e469f3a25c164dc1bc326d831dae7dd9ff024155bf399b562c444d2",
+      "backend": "cursor",
+      "base_sha": "5ed8c5a3206c67b9bc3e2df53a9ed69b8ce435a7",
+      "counter_kind": "plan",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "cursor",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5e78a3f0a211175bf2c760c9fcd3d429",
+            "classification": "introduced",
+            "findingId": "finding-5e78a3f0a211175bf2c760c9fcd3d429",
+            "firstSeenThisRound": true,
+            "severity": "P1",
+            "status": "open"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "5529b47ad26d72ad72d799d8d8be3f0546794690",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-5.6-sol-high",
+      "outcome": "verdict",
+      "output_bytes": 5768,
+      "output_sha256": "7d1cda8b5f1f767761bbca6d1943f825b08eb1f7cced487879dd30338fd1e2bd",
+      "reservation_id": "36d668862e56415f84e7375f3344af59",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-08-26T21:14:46.887883Z",
+      "verdict": "NEEDS_WORK"
     }
   ],
   "review_hash_epoch": {
@@ -280,6 +323,7 @@
     }
   },
   "review_transport_failures": {
+    "completion": 0,
     "impl:fn-2-easy-install-setup.1": 0,
     "impl:fn-2-easy-install-setup.2": 0,
     "plan": 0
@@ -298,5 +342,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-26T21:06:55.161886Z"
+  "updated_at": "2026-08-26T21:14:46.890592Z"
 }
