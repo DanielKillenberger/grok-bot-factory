@@ -28,10 +28,24 @@ function isContentsListing(body: string): boolean {
 
 export type MemberResult = "member" | "quiet" | "stuck";
 
+/** Exactly one `owner/name` pair; extra slashes or blanks fail closed. */
+export function isRepoFullName(s: string): boolean {
+  const parts = s.split("/");
+  if (parts.length !== 2) return false;
+  const [owner, repo] = parts;
+  return owner.length > 0 && repo.length > 0 && !/\s/.test(s);
+}
+
 export async function probeFlowDir(
   fullName: string,
   ref?: string,
 ): Promise<{ result: MemberResult; reason?: string }> {
+  if (!isRepoFullName(fullName)) {
+    return {
+      result: "stuck",
+      reason: `membership: invalid repo name ${fullName}`,
+    };
+  }
   const [owner, repo] = fullName.split("/");
   const argv = [
     "api",

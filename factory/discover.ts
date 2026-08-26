@@ -2,7 +2,7 @@
 import { parseArgs } from "./lib/args.ts";
 import { runCli, stuck } from "./lib/exit.ts";
 import { gh } from "./lib/gh.ts";
-import { probeFlowDir } from "./lib/membership.ts";
+import { isRepoFullName, probeFlowDir } from "./lib/membership.ts";
 
 const ALLOWED = new Set(["whitelist", "owner", "named"]);
 const PAGE = 100;
@@ -32,7 +32,7 @@ function parseRepoList(stdout: string): string[] | undefined {
       return undefined;
     }
     const n = (item as { nameWithOwner?: unknown }).nameWithOwner;
-    if (typeof n !== "string" || !n.includes("/") || n.split("/").length !== 2) {
+    if (typeof n !== "string" || !isRepoFullName(n)) {
       return undefined;
     }
     names.push(n);
@@ -73,12 +73,16 @@ export async function runDiscover(argv: string[]): Promise<DiscoverResult> {
   const owner = flags.get("owner");
 
   const scan = new Set<string>();
+  const add = (n: string) => {
+    if (!isRepoFullName(n)) stuck(`discover: invalid repo name ${n}`);
+    scan.add(n);
+  };
   if (whitelist.length > 0) {
-    for (const n of whitelist) scan.add(n);
+    for (const n of whitelist) add(n);
   } else {
-    for (const n of await listRepos(owner)) scan.add(n);
+    for (const n of await listRepos(owner)) add(n);
   }
-  for (const n of named) scan.add(n);
+  for (const n of named) add(n);
 
   const candidates: string[] = [];
   const namedWithoutFlow: string[] = [];

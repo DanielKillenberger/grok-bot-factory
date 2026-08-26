@@ -104,6 +104,16 @@ test("named repo without .flow is reported, not skipped or inited", async () => 
   noHooks("named");
 });
 
+test("malformed owner/name fails closed", async () => {
+  for (const name of ["acme/app/typo", "acme/", "/app", "noslash"]) {
+    const res = await runDiscover(["--named", name]);
+    expect(res.code, name).toBe(20);
+    expect(res.stdout.trim(), name).toBe("");
+    expect(res.stderr, name).toMatch(/invalid repo name/);
+    noHooks(name);
+  }
+});
+
 test("whitelist overlay does not fleet-scan", async () => {
   const res = await runDiscover(["--whitelist", "acme/app"]);
   expect(res.code).toBe(0);
