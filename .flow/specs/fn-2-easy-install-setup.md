@@ -32,11 +32,15 @@ Reuse fn-1’s single-repo `.flow/` probe. Discovery **lists** candidates (`gh r
 5. On confirm: create the builder webhook routine `{ "type": "webhook" }` if missing. That routine **reuses fn-1’s contract**: command-first exec of the gate program on a gate-valid GitHub push body (zero model tokens), then the coordinator/tick runner, with the instance host-CLI input. Fail closed if routine URL and sender key cannot be obtained (owner paste from the panel is allowed). Do not invent a Grok Bot REST client. One routine for all Actions. Do not mint a second routine.
 6. Standing fire path (live e2e): a GitHub Action in each confirmed product repo POSTs `GITHUB_EVENT_PATH` to that **one** builder webhook with `Authorization: Bearer`. Native Settings webhooks cannot wake Cursor/Grok Bot — GitHub sends HMAC; Cursor wants `Authorization: Bearer <sender key>`; HMAC in the hook Secret field is ignored. Easy-install does **not** create Settings→Webhooks. [user]
 7. Workflow secrets (never in git): `GROK_BOT_WEBHOOK_URL`, `GROK_BOT_SENDER_KEY`. Owner copies both from the Grok Bot routine panel. GitHub never returns secret values; setup cannot copy secrets from one repo to another. Fail closed if the owner cannot supply both. [user]
-8. Identity: Cursor webhook wakes deliver `{headers, body_digest, timestamp_ms}`, not the POST body. Custom `X-Factory-*` headers are stripped. User-Agent survives. The Action MUST send `User-Agent: factory-forward repo=<owner/name> sha=<40hex> ref=<git-ref>`. The wake materializes a gate-valid push JSON from that (or a real body if present). Fail closed if identity cannot be recovered. Never assume a single repo. [user]
+8. Identity: Cursor webhook wakes deliver `{headers, body_digest, timestamp_ms}`, not the POST body. Custom `X-Factory-*` headers are stripped. User-Agent survives. The Action MUST send `User-Agent: factory-forward repo=<owner/name> sha=<40hex> ref=<git-ref>`. The wake materializes a gate-valid push JSON from that (or a real body if present). Fail closed if identity cannot be recovered. Never assume a single repo. [user] Identity recovery for the wake: a real GitHub push body if present, else the User-Agent factory-forward line, else fail-closed. Never assume a repo. [user] `X-Factory-*` is not a required recovery path — Cursor strips them; the Action may still send them but the factory must not need them. [user]
 9. On confirm, install that Action on each confirmed repo (converge the workflow file) and require the two workflow secrets to be set (owner paste; Actions secrets API cannot read values back). Re-run is idempotent (converge the Action file; remind that secrets still cannot be proven by GET). Partial failure: no automatic rollback. Report what succeeded.
 10. Deliverable is setup software. Do not arm live repos as a side effect of implementing or rewriting this spec.
 
 Factory runtime (fn-1, already shipping — not this spec’s work): `ADVANCED` is quiet (next wake continues). `DEFERRED_TO_LAND` starts a land tick automatically (merge is not owner-gated). Ping only `NEEDS_HUMAN` or `ASKED`. [user]
+
+Gate exits: 0 quiet / 10 start / 20 stuck. [user]
+
+Merge is factory land. The owner still confirms ready on specs. [user]
 
 Rejected as overkill: native Settings→Webhooks as the install fire path (HMAC Secret is ignored; Cursor wants Bearer); a new GitHub/git bot; auto-init of `.flow/`; dashboard; inventing instance-config filenames; inventing Grok Bot REST; minting a second routine; copying secrets between repos.
 
@@ -63,6 +67,10 @@ Not the fire path: `POST /repos/{owner}/{repo}/hooks`. Native Settings webhooks 
 
 Action identity contract: `User-Agent: factory-forward repo=<owner/name> sha=<40hex> ref=<git-ref>`. Wake envelope is `{headers, body_digest, timestamp_ms}` (body not delivered). Materialize a gate-valid GitHub push JSON from User-Agent, or use a real push body if present. Fail closed if identity cannot be recovered. Never assume a single repo.
 
+Identity recovery for the wake: a real GitHub push body if present, else the User-Agent factory-forward line, else fail-closed. Never assume a repo. `X-Factory-*` is not a required recovery path — Cursor strips them; the Action may still send them but the factory must not need them.
+
+Gate exits: 0 quiet / 10 start / 20 stuck. Merge is factory land. The owner still confirms ready on specs.
+
 Actions secrets: GitHub never returns secret values on GET. Setup cannot prove a secret matches, and cannot copy secrets repo-to-repo. Owner paste is the set path.
 
 Storage filenames for instance inputs: unknown, instance config, not this git repo. [user]
@@ -78,6 +86,9 @@ Storage filenames for instance inputs: unknown, instance config, not this git re
 - Partial setup: report; no automatic rollback; retry is idempotent (converge Action file; secrets still owner-set).
 - GitHub never returns secret values; missing or unreadable secrets fail closed. Do not invent a copy-from-other-repo shortcut.
 - Wake without recoverable identity (no User-Agent match and no real body) fails closed. Never assume a single repo.
+- Identity recovery for the wake: a real GitHub push body if present, else the User-Agent factory-forward line, else fail-closed. Never assume a repo. `X-Factory-*` is not a required recovery path — Cursor strips them; the Action may still send them but the factory must not need them.
+- Gate exits: 0 quiet / 10 start / 20 stuck.
+- Merge is factory land. The owner still confirms ready on specs.
 
 ## Quick commands
 
@@ -94,6 +105,7 @@ tests/factory/discover.test.sh
 <!-- scope: business -->
 
 - Factory runtime is fn-1 (already shipping: `ADVANCED` quiet; `DEFERRED_TO_LAND` auto-lands; ping only `NEEDS_HUMAN` or `ASKED`). [user]
+- Gate exits: 0 quiet / 10 start / 20 stuck. Merge is factory land. The owner still confirms ready on specs. [user]
 - Do not arm live repos as a side effect of implementing or rewriting this spec. [user]
 - Out of scope: dashboard, inventing payload field names, inventing instance-config filenames. [user]
 - Out of scope: Settings→Webhooks as the install fire path; automatic rollback of a partial Action install; inventing a Grok Bot REST client; autonomy-knob values; copying secrets between repos.
@@ -117,6 +129,7 @@ Once the factory runs, setup should be “give this repo to my main agent.” [u
 - Partial-setup rollback is not built: idempotent retry + a success/fail report is enough.
 - The easy-install routine is not a second factory. It must invoke fn-1’s gate command-first.
 - fn-1 already ships automatic factory behavior (`ADVANCED` quiet; `DEFERRED_TO_LAND` starts land; ping only `NEEDS_HUMAN` or `ASKED`). Easy-install must not reintroduce owner-gated merge or progress pings.
+- Gate exits stay 0 quiet / 10 start / 20 stuck. Merge is factory land; the owner still confirms ready on specs. Identity recovery is a real GitHub push body if present, else the User-Agent factory-forward line, else fail-closed — never assume a repo, and never require `X-Factory-*` (Cursor strips them; the Action may still send them).
 
 ## Acceptance Criteria
 <!-- scope: both -->
@@ -208,3 +221,9 @@ Task fn-2-easy-install-setup.1 proves discover-then-confirm: complete candidate 
 > user: Keep fn-2 generic (no personal names). Owner / GitHub / builder / notify stay instance config.
 
 > user: Do not arm live repos as a side effect of rewriting the spec.
+
+> user: Gate exits: 0 quiet / 10 start / 20 stuck.
+
+> user: Merge is factory land. The owner still confirms ready on specs.
+
+> user: Identity recovery for the wake: a real GitHub push body if present, else User-Agent factory-forward line, else fail-closed. Never assume a repo. X-Factory-* is not a required recovery path — Cursor strips them; the Action may still send them but the factory must not need them.
