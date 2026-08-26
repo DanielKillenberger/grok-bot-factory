@@ -41,9 +41,13 @@ Conversational discovery for easy-install (R1, R3, R5): list `.flow/` candidates
 - [ ] Tests do not arm live repos
 
 ## Done summary
-TBD
+Discover-then-confirm membership: paginated `gh repo list` plus the fn-1 `.flow/` contents probe, fail-closed incomplete scans, named repos without `.flow/` reported for the main-agent ask, easy-install skill waits for an explicit confirm before any hook mutate.
 
+Whitelist overlay is flag/env only. Canonical `owner/name` validation is shared with push identity parsing.
+
+stage: impl-review - ran [2026-08-26T20:38:46Z..2026-08-26T20:44:30Z] (model: gpt-5.6-sol-high)
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 8cac845239721f6aeebeeec9a4f5cd6350d72184, ea2043ce40896cb51a3b36f13becc3638f60112d, 9d325def79b5057ffce503ff5aef9f2b984aa42c
+- Tests: bun test, tests/factory/discover.test.sh
 - PRs:
