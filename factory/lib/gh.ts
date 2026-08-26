@@ -1,6 +1,14 @@
 import { runCmd, which } from "./cmd.ts";
 
-export type GhClass = "ok" | "401" | "404" | "403" | "429" | "5xx" | "transport";
+export type GhClass =
+  | "ok"
+  | "401"
+  | "404"
+  | "403"
+  | "422"
+  | "429"
+  | "5xx"
+  | "transport";
 
 export type GhResult = {
   ok: boolean;
@@ -11,6 +19,7 @@ export type GhResult = {
 
 function classFromErr(err: string): GhClass {
   if (/HTTP 429/.test(err)) return "429";
+  if (/HTTP 422/.test(err)) return "422";
   if (/HTTP 404/.test(err)) return "404";
   if (/HTTP 403/.test(err)) return "403";
   if (/HTTP 401/.test(err)) return "401";
@@ -18,13 +27,19 @@ function classFromErr(err: string): GhClass {
   return "transport";
 }
 
-export async function gh(argv: readonly string[]): Promise<GhResult> {
+export async function gh(
+  argv: readonly string[],
+  opts: { stdin?: string } = {},
+): Promise<GhResult> {
   if (!which("gh")) {
     return { ok: false, class: "transport", stdout: "", stderr: "gh missing" };
   }
+  const stdin = opts.stdin
+    ? new TextEncoder().encode(opts.stdin)
+    : "ignore";
   let attempt = 0;
   while (true) {
-    const res = await runCmd(["gh", ...argv]);
+    const res = await runCmd(["gh", ...argv], { stdin });
     if (res.timedOut) {
       return {
         ok: false,

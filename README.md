@@ -2,7 +2,7 @@
 
 This repo ships the factory program: a deterministic wake gate, an isolated tick runner, and stuck/owner-gated notify. Grok Bot skills invoke that program; they are not a substitute for the gate.
 
-Copy these steps. Easy-install is later and is not required. A dashboard is welcome later.
+Copy these steps. Easy-install (send this repo to **main**) is optional; hand-wire below is enough. A dashboard is welcome later.
 
 The **builder** Grok Bot owns the webhook routine and supervises. Product work happens in a documented flow-next host (`/loop` or `/goal` calling `/flow-next:pilot` or `/flow-next:land`), not in Grok Bot chat. The host CLI is instance-configurable (flag/env; default = a documented host already on the builder machine). The product review pin is the checkout’s `.flow/config.json` `review.backend` plus instruction-file routing — not the host CLI, and not a hardcoded review model.
 
@@ -46,9 +46,13 @@ Ping only when something needs a decision: `NEEDS_HUMAN`, `ASKED`, or an owner-g
 
 No “picked up”, no “still running”, no “PR opened”.
 
-## Easy-install (later)
+## Easy-install
 
-Not required. Manual wiring above is enough.
+Send this repo to your **main** Grok Bot agent. Main assigns an existing builder (creates one only if none exists), lists `.flow/` candidates, waits for confirm, then creates the builder’s webhook routine if missing and converges GitHub **push** hooks on the confirmed set. After hooks exist, ticks are the factory program above.
+
+Hand-wire (Wake) remains valid. Easy-install is optional and not required.
+
+Main supervises setup only. The routine’s first action is still `bun factory/gate.ts` (no model), then `factory/tick.ts` with the instance host CLI. Do not overwrite a product repo’s flow-next:setup review pin.
 
 ## Footnotes (not the path)
 
