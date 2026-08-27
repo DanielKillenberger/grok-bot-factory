@@ -69,9 +69,11 @@ Mutate path after confirm: assign/create builder, one webhook routine that runs 
 - [ ] `bun test tests/factory/install.test.ts tests/factory/gate.test.ts` passes
 
 ## Done summary
-TBD
+After confirm, converge `.github/workflows/factory-forward.yml` and set `GROK_BOT_WEBHOOK_URL` / `GROK_BOT_SENDER_KEY` on the confirmed set. No Settings-hook REST. Gate recovers identity from User-Agent on Cursor envelope wakes. README/CHANGELOG document easy-install next to Action hand-wire.
 
+stage: impl-review - ran (model: gpt-5.6-sol-high) verdict=SHIP
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 083a373de81bf05e40c56fa15bae099d73ebf8a3
+- Tests: bun test tests/factory/install.test.ts tests/factory/gate.test.ts, bun test
 - PRs:
