@@ -1,6 +1,6 @@
 ---
 name: easy-install
-description: Main Grok Bot supervises factory setup. Discover .flow/ repos, wait for owner confirm, then install the factory-forward Action. Do not mutate before confirm.
+description: Main Grok Bot walks the owner through factory setup. Confirm this factory only works with flow-next, then find repos, pick a set, builder/webhook, paste two secrets, done. Do not mutate before confirm.
 ---
 
 # Easy-install
@@ -9,15 +9,39 @@ You are the owner’s **main** Grok Bot agent. Setup is a conversation, not a cl
 
 Implementing or reading this skill does not arm a production wake.
 
+Pause only at owner decisions: they understand flow-next; where to apply / whether `/flow-next:setup` if they do not; a named repo without `.flow/`; which candidate set to install; create vs reuse builder when that choice exists; paste the two secrets.
+
 ## Inputs
 
 - Instance host CLI stays instance config (fn-1, `FACTORY_HOST` / `--host`). Do not overwrite a product repo’s flow-next:setup review pin (`review.backend` and the instruction-file routing block stay). Do not re-run `/flow-next:setup` on confirmed repos to refresh that pin.
 - Whitelist overlay is flag/env only (`--whitelist` / `FACTORY_MEMBERSHIP_WHITELIST`). There is no allowlist in this repo.
 - Routine URL and sender key come from the builder’s Routines panel (owner paste is allowed). Never write them to git.
 
-## 1. Discover
+## 1. Orient
 
-Run the discover program. Do not clone. Do not call GitHub hook APIs. Do not write Actions secrets or workflow files.
+This factory only works with flow-next (product repos that have flow-next / `.flow/` specs).
+
+Wait for them to confirm they understand. Do not run discover yet.
+
+If they do not confirm: do not run fleet `bun factory/discover.ts`. Ask where they want to apply this factory, and whether they want to install flow-next there (`/flow-next:setup`). Do not auto-init.
+
+When they name a repo on this no-confirm path (or after an empty candidate list later), probe only that name — both flags; bare `--named` still fleet-scans, so do not use it alone here:
+
+```bash
+bun factory/discover.ts --named owner/name --whitelist owner/name
+```
+
+`--whitelist` is the existing overlay as a one-shot named constraint, not a frozen allowlist.
+
+- Name in `candidates`: go to You pick with that one-name set. Wait for an explicit confirmation reply. Then install only names in this `candidates` list.
+- Name in `named_without_flow`: ask whether they intended that repo and whether to init flow-next (`/flow-next:setup`). Do not auto-init. Do not silently skip. Do not install. After they finish setup, re-run the same targeted discover until the name is in `candidates`.
+- Exit 20: show stderr and stop.
+
+`install.ts` does not verify `.flow/`. Never `bun factory/install.ts --confirmed` a name that this targeted discover did not return in `candidates`.
+
+## 2. Find repos
+
+They confirmed they understand, so list the flow-next product repos — existing discover, no clone, no GitHub hook APIs, no secret or workflow writes.
 
 ```bash
 bun factory/discover.ts
@@ -27,19 +51,21 @@ Optional: `--owner <login>`, `--named owner/name,...`, `--whitelist owner/name,.
 
 Stdout is JSON: `{ "candidates": ["owner/name", ...], "named_without_flow": [...] }`. Exit 20 is fail-closed (incomplete scan). Do not treat a partial or empty-on-error list as “the candidates.” Show the stderr reason and stop.
 
-## 2. Named repo without `.flow/`
+Empty `candidates`: show the empty set. Wait for a named repo or stop. Do not invent a confirm set. A later named repo uses the same targeted discover as no-confirm (`--named` and `--whitelist` together), not a silent fleet re-scan.
+
+## 3. You pick
+
+They choose which repos get the factory — present `candidates` and wait.
 
 If `named_without_flow` is non-empty, ask whether they intended that repo and whether to init flow-next (`/flow-next:setup`). Do not auto-init. Do not silently skip.
-
-## 3. Confirm (required)
 
 Present the candidate `owner/name` list. Wait for an explicit confirmation reply naming the set to install.
 
 A confirm card may appear; conversation-only still works. Unconfirmed candidates never reach Action install or routine create.
 
-## 4. Builder and routine
+## 4. Builder/webhook
 
-Assign an existing builder Grok Bot by default. Create one only if none exists (conversation/UI — there is no public Grok Bot REST). Re-runs reuse the same builder.
+One builder, one webhook routine for all Actions — assign an existing builder Grok Bot by default. Create one only if none exists (conversation/UI — there is no public Grok Bot REST). Re-runs reuse the same builder.
 
 Create a webhook routine `{ "type": "webhook" }` on that builder if missing. Re-run reuses it — do not mint a second routine (duplicate wakes). Fail closed if the routine URL and sender key cannot be obtained (owner paste from the Routines panel is allowed). Do not invent a Grok Bot REST client.
 
@@ -59,9 +85,9 @@ If the panel cannot exec a command before a model, stop. Do not start a model to
 
 The gate recovers identity from a real GitHub push body if present, else `User-Agent: factory-forward repo=<owner/name> sha=<40hex> ref=<git-ref>`, else fail closed.
 
-## 5. Mutate — only after confirm
+## 5. Paste two secrets
 
-The install program is a skill→program boundary. Invoke it **only after that confirmation reply**, with the named confirmed subset. Never pass discover stdout / a `candidates` JSON object / `--candidates`.
+The Action needs two secrets GitHub never shows back — owner pastes `GROK_BOT_WEBHOOK_URL` and `GROK_BOT_SENDER_KEY` from the routine panel, then you install only after that confirmation reply, with the named confirmed subset. Never pass discover stdout / a `candidates` JSON object / `--candidates`.
 
 ```bash
 bun factory/install.ts --confirmed owner/name,owner/other
@@ -70,6 +96,12 @@ bun factory/install.ts --confirmed owner/name,owner/other
 Supply routine URL and sender key in the environment (not git): `GROK_BOT_WEBHOOK_URL`, `GROK_BOT_SENDER_KEY`. Fail closed if either is missing.
 
 Do not POST GitHub Settings hooks. Do not copy secrets between repos. Partial failure is reported (succeeded/failed repos); there is no automatic rollback. Re-run is idempotent (converge the Action file; secrets still owner-set).
+
+## 6. Done
+
+The fire path exists; ticks are fn-1 now.
+
+Stop. Do not recap.
 
 ## Do not
 

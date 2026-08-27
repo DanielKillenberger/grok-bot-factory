@@ -161,6 +161,27 @@ for (const [label, stub] of failClosed) {
   });
 }
 
+const WALKTHROUGH_BEATS = [
+  "Orient",
+  "Find repos",
+  "You pick",
+  "Builder/webhook",
+  "Paste two secrets",
+  "Done",
+] as const;
+
+function beatHeading(n: number, title: string): RegExp {
+  return new RegExp(`^## ${n}\\.\\s+${title.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}\\s*$`, "m");
+}
+
+function beatBody(skill: string, n: number, title: string): string {
+  const start = skill.search(beatHeading(n, title));
+  if (start < 0) return "";
+  const rest = skill.slice(start);
+  const next = rest.search(/\n## /);
+  return next < 0 ? rest : rest.slice(0, next);
+}
+
 test("skill waits for confirm and does not invoke install before it", () => {
   const skill = readFileSync(SKILL_EASY_INSTALL, "utf8");
   expect(skill).toMatch(/Wait for an explicit confirmation reply/);
@@ -170,6 +191,51 @@ test("skill waits for confirm and does not invoke install before it", () => {
   expect(skill).toMatch(/conversation, not a clicks-only UI/);
   expect(skill).not.toMatch(/hooks\.github\.com/);
   expect(skill).not.toMatch(/factory\/hooks\.ts/);
+});
+
+test("skill is a six-beat walkthrough that orients before discover", () => {
+  const skill = readFileSync(SKILL_EASY_INSTALL, "utf8");
+  const fm = skill.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? "";
+  expect(fm).not.toMatch(/description:\s*.*Discover/i);
+
+  let last = -1;
+  for (const [i, title] of WALKTHROUGH_BEATS.entries()) {
+    const idx = skill.search(beatHeading(i + 1, title));
+    expect(idx, title).toBeGreaterThan(last);
+    last = idx;
+    const prose = beatBody(skill, i + 1, title)
+      .replace(/^## .*$/m, "")
+      .replace(/```[\s\S]*?```/g, "")
+      .trim();
+    const firstPara = (prose.split(/\n\s*\n/)[0] ?? "").replace(/\s+/g, " ").trim();
+    expect(firstPara, `${title} why`).toMatch(/[A-Za-z].{15,}/);
+    expect(firstPara, `${title} not a command-only beat`).not.toMatch(/^```/);
+  }
+
+  const orient = skill.search(beatHeading(1, "Orient"));
+  const firstDiscoverFence = skill.search(/```(?:bash)?\n[^\n]*bun factory\/discover\.ts/);
+  expect(orient).toBeGreaterThan(-1);
+  expect(firstDiscoverFence).toBeGreaterThan(orient);
+});
+
+test("skill no-confirm path uses targeted named+whitelist discover, not fleet", () => {
+  const skill = readFileSync(SKILL_EASY_INSTALL, "utf8");
+  expect(skill).toMatch(/do not confirm/i);
+  expect(skill).toMatch(/\/flow-next:setup/);
+  expect(skill).toMatch(
+    /bun factory\/discover\.ts --named owner\/name --whitelist owner\/name/,
+  );
+  expect(skill).toMatch(/did not return in `candidates`/);
+
+  const fleetFence = /```(?:bash)?\n\s*bun factory\/discover\.ts\s*\n```/;
+  const findRepos = skill.search(beatHeading(2, "Find repos"));
+  expect(skill.search(fleetFence)).toBeGreaterThan(findRepos);
+
+  const noConfirmStart = skill.search(/do not confirm/i);
+  const noConfirm = skill.slice(noConfirmStart, findRepos);
+  expect(noConfirm).not.toMatch(fleetFence);
+  expect(noConfirm).toMatch(/--named owner\/name --whitelist owner\/name/);
+  expect(noConfirm).not.toMatch(/```(?:bash)?\n\s*bun factory\/discover\.ts --named owner\/name\s*\n```/);
 });
 
 test("no hardcoded allowlist in discover sources", () => {
