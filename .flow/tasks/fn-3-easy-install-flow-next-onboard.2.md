@@ -44,9 +44,8 @@ Match the README Easy-install section to the skill walkthrough and document same
 - [ ] `bun test tests/factory/notify.test.ts` passes after the README rewrite
 - [ ] No secrets, instance names, or live-arm instructions in git
 ## Done summary
-TBD
-
+README Easy-install is a six-beat walkthrough matching the skill, with same-account later-proof e2e documented (no-builder create vs designated test builder; never live factory). CHANGELOG notes the conversation-first walkthrough. Cursor impl-review SHIP.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: ed43d984f1c78052691599fb973ef95efa6b5d9f, 524645a17e39e9a51d3f6f19e5d9a1859bf6f5b7, 6d2864908c5316fb63e824728e895731e9e0ae2c, 610cff4f85d92f82e129385a56694bc4fa9fb8ae
+- Tests: bun test tests/factory/notify.test.ts
 - PRs:
