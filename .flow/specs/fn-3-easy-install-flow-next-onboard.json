@@ -1,13 +1,21 @@
 {
   "branch_name": "fn-3-easy-install-flow-next-onboard",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
   "created_at": "2026-08-27T17:21:54.993729Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
   "depends_on_epics": [
     "fn-2-easy-install-setup"
   ],
   "id": "fn-3-easy-install-flow-next-onboard",
+  "impl_review_rounds": {},
   "next_task": 1,
+  "plan_review_rounds": 0,
   "plan_review_status": "unknown",
   "plan_reviewed_at": null,
+  "ready": true,
   "spec_path": ".flow/specs/fn-3-easy-install-flow-next-onboard.md",
   "status": "open",
   "title": "Easy-install flow-next onboard",
@@ -22,5 +30,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-27T17:34:48.780065Z"
+  "updated_at": "2026-08-27T19:04:31.614018Z"
 }

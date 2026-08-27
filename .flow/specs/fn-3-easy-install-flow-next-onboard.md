@@ -20,90 +20,49 @@
 
 > user (turn 9): "Do not reopen fn-2-easy-install-setup; that is status=done. This is a new spec."
 
-> user (turn 10): "Do not implement product code in this capture. Spec only."
+> user (turn 10): "Named repo without `.flow/`: ask intent and whether to init flow-next. No auto-init, no silent skip."
 
-> user (turn 11, standing/fn-2): "Easy-install after the owner understands: discover-then-confirm, then one builder webhook routine + factory-forward GitHub Action + workflow secrets GROK_BOT_WEBHOOK_URL and GROK_BOT_SENDER_KEY (owner paste from the routine panel). Not Settings→Webhooks."
+> user (turn 11): "One builder webhook for all Actions. Do not mint a second routine."
 
-> user (turn 12, standing/fn-2): "Named repo without `.flow/`: ask intent and whether to init flow-next. No auto-init, no silent skip."
+> user (turn 12): "Factory runtime is fn-1 (already shipping). This spec does not reopen those."
 
-> user (turn 13, standing/fn-2): "One builder webhook for all Actions. Do not mint a second routine."
+> user (turn 13): "Program tests stay stubbed bun test. They do not prove conversation or install."
 
-> user (turn 14, standing/fn-2): "Factory runtime is fn-1 (already shipping). This spec does not reopen those."
+> user (turn 14): "Same-account test env (no second login): a second main on the same account. Never reuse the live factory builder or the live factory-wake webhook or live secrets."
 
-> user (turn 15): "Program tests stay stubbed bun test. They do not prove conversation or install."
+> user (turn 15): "Two e2e cases (documented, not run in this spec): (a) no builder — create a new builder + webhook; live teammates do not count as an existing builder; (b) existing builder — reuse a designated test builder only, do not create a third, never the live factory builder."
 
-> user (turn 16): "Named repo without `.flow/`: same ask, never skip silently, never auto-init."
+> user (turn 16): "Throwaway product repo only. Do not arm live factory-wake. Shared computer/GitHub is expected."
 
-> user (turn 17): "Rest of easy-install unchanged after the onboard gate."
+> user (turn 17): "Live same-account e2e is AFTER the skill ships, not this spec's implement now."
 
-> user (turn 18): "Deliverable is skill + a short README beat; program changes only if needed (discover can stay)."
+> user (turn 18): "Do not put routine URL, sender key, tokens, PATs, sessions, or vault paths in git."
 
-> user (turn 19): "Same-account test env (no second login): a second main on the same account. Never reuse the live factory builder or the live factory-wake webhook or live secrets."
+> user (turn 19): "can we reshape th fn-3 spec to not just fix this wrong assumption but also make the UX really nice for the end user with a easy to understand walk through flow that explains enought but doesn't over explain. Just nice and smooth."
 
-> user (turn 20): "Two e2e cases (documented, not run in this spec): (a) no builder — create a new builder + webhook; live teammates do not count as an existing builder; (b) existing builder — reuse a designated test builder only, do not create a third, never the live factory builder."
+> user (turn 20): "Whole setup as short beats"
 
-> user (turn 21): "Throwaway product repo only. Do not arm live factory-wake. Shared computer/GitHub is expected."
-
-> user (turn 22): "Program tests stay stubbed bun test; they do not prove conversation or install. Live same-account e2e is AFTER the skill ships, not this spec's implement now."
-
-> user (turn 23): "Keep generic in spec prose (owner / builder / notify). Instance names stay out of the spec file; the test-env is \"a second main on the same account, new builder or reuse a designated test builder, never the live factory.\""
-
-> user (turn 24): "Still: first explain flow-next; confirm → discover + Action install; no confirm → ask repo + offer `/flow-next:setup`; never auto-init."
-
-> user (turn 25): "fn-2 stays done. Skill + short README. Discover program can stay."
-
-> user (turn 26): "Still not ready. Do not implement product code. Spec only."
-
-> user (turn 27): "Do not put routine URL, sender key, tokens, PATs, sessions, or vault paths in git."
-
-## Overview
-
-Easy-install today assumes the owner already knows flow-next. [user]
-
-The first step is to explain that this factory only works with flow-next (product repos that have flow-next / `.flow/` specs). [user]
-
-If the owner confirms they understand: run discover (`bun factory/discover.ts`), then the existing confirm-then-install path (factory-forward GitHub Action + two secrets, one builder webhook, not Settings hooks). [user]
-
-If they do not confirm: do not silently discover. Ask where they want to apply the factory, and whether to install flow-next there (`/flow-next:setup`). Never auto-init. [user]
-
-Named repo without `.flow/`: same ask, never skip silently, never auto-init. [user]
-
-After the onboard gate, the rest of easy-install is unchanged. [user]
-
-Deliverable is the skill plus a short README beat. Discover program can stay. Program changes only if needed. [user]
-
-Program tests stay stubbed bun test and do not prove conversation or install. [user]
-
-Same-account test env (no second login): a second main on the same account, new builder or reuse a designated test builder, never the live factory. Never reuse the live factory builder or the live factory-wake webhook or live secrets. [user]
-
-Two e2e cases, documented not run in this spec: [user]
-
-- No-builder: create a new builder + webhook; live teammates do not count as an existing builder. [user]
-- Existing-builder: reuse a designated test builder only; do not create a third; never the live factory builder. [user]
-
-Throwaway product repo only. Do not arm live factory-wake. Shared computer and GitHub are expected. [user]
-
-Live same-account e2e is AFTER the skill ships, not this spec's implement now. [user]
-
-fn-2 stays done. Ready remains false. Do not implement. [user]
-
-Keep generic in spec prose: owner / GitHub / builder / notify. Instance names stay out of the spec file. [user]
+> user (turn 20, confirmed option): orient (this factory only works with flow-next), find repos, you pick, builder/webhook, paste two secrets, done. Each beat is one short why, then the action. Pause only when you need to decide. No lecture at the start, no recap novel at the end.
 
 ## Goal & Context
 <!-- scope: business -->
-<!-- Goal & Context: 100% [user] -->
+<!-- Goal & Context: 80% [user], 20% [paraphrase] -->
 
 Easy-install currently reads as if the owner already knows flow-next (`.flow/`, `/flow-next:setup`, fn-1 ticks, review pins). [user]
 
-This spec adds a conversation-first onboard gate so the owner is told that this factory only works with flow-next (product repos that have flow-next / `.flow/` specs) before discover. [user]
+Fixing that assumption is not enough. The whole setup conversation should be an easy walkthrough: enough explanation, not over-explanation; nice and smooth. [user]
 
 Target user: the owner. Product-role language stays generic: owner / GitHub / builder / notify. Instance names stay out of the spec file. [user]
 
-If they confirm they understand: run discover, then existing confirm-then-install. If they do not confirm: ask where they want to apply the factory, and whether to install flow-next there (`/flow-next:setup`). Never auto-init. [user]
+The walkthrough is the whole setup, as short beats: orient (this factory only works with flow-next), find repos, you pick, builder/webhook, paste two secrets, done. [user]
 
-Why now: the rest of easy-install (confirm set, one builder webhook, factory-forward GitHub Action + two secrets, not Settings hooks) already ships on fn-2-easy-install-setup (status=done). That path is not this spec's work. [user]
+Each beat is one short why, then the action. Pause only when the owner needs to decide. No lecture at the start, no recap novel at the end. [user]
 
-Deliverable is the skill plus a short README beat. Discover program can stay. [user]
+If they confirm they understand: run existing discover, then the existing confirm-then-install path. If they do not confirm: do not silently discover; ask where they want to apply the factory, and whether to install flow-next there (`/flow-next:setup`). Never auto-init. [user]
+
+Why now: the fire path already ships on fn-2-easy-install-setup (status=done) — confirm set, one builder webhook, factory-forward GitHub Action + two secrets, not Settings hooks. That path is not this spec's work. This spec owns the conversation around it. [user]
+
+Deliverable is the skill plus a short README beat. Discover program can stay. Program changes only if needed. [user]
 
 Program tests stay stubbed bun test. They do not prove conversation or install. [user]
 
@@ -111,21 +70,30 @@ Same-account test env (no second login): a second main on the same account, new 
 
 Two e2e cases are documented later-proof to run AFTER the skill ships, not this spec's implement now. [user]
 
-This capture is draft / not ready. Ready is owner confirmation later. Do not implement. [user]
+This capture is draft / not ready. Ready is owner confirmation later. Do not implement product code in this capture. [user]
 
 ## Architecture & Data Models
 <!-- scope: technical -->
-<!-- Architecture & Data Models: 100% [user] -->
+<!-- Architecture & Data Models: 70% [user], 30% [paraphrase] -->
 
-Easy-install's new first step is a conversation check, not a silent program. [user]
+Easy-install's conversation is a short-beat walkthrough, not a silent program and not a lecture. [user]
 
-1. Explain that this factory only works with flow-next (product repos that have flow-next / `.flow/` specs). [user]
-2. If the owner confirms they understand: run existing discover (`bun factory/discover.ts`) and continue the existing confirm-then-install Action path (factory-forward GitHub Action + two secrets, one builder webhook, not Settings hooks). [user]
-3. If they do not confirm: do not silently discover. Ask where they want to apply this factory, and whether they want to install flow-next there (`/flow-next:setup`). Never auto-init. [user]
-4. Named repo without `.flow/`: same ask, never skip silently, never auto-init. [user]
-5. After that onboard gate, the rest of easy-install is unchanged. [user]
+Beats, in order:
 
-Discover can stay. The new branch is conversation-first. Program changes only if needed. [user]
+1. Orient — this factory only works with flow-next (product repos that have flow-next / `.flow/` specs). One short why, then wait for confirm they understand. [user]
+2. Find repos — existing discover program. [user]
+3. You pick — present candidates; wait for an explicit confirmation naming the set. Named repo without `.flow/`: ask intent and whether to init flow-next (`/flow-next:setup`). Never auto-init, never silent skip. [user]
+4. Builder/webhook — assign an existing builder; create one only if none exists. One webhook routine for all Actions; do not mint a second. [user]
+5. Paste two secrets — owner pastes workflow secrets `GROK_BOT_WEBHOOK_URL` and `GROK_BOT_SENDER_KEY` from the routine panel (not copied between repos, not Settings hooks). Then the existing factory-forward GitHub Action install on the confirmed set. [user]
+6. Done — a short close, not a recap. [user]
+
+Each beat: one short why, then the action. Pause only at owner decisions. [user]
+
+Owner decisions (the only pauses): understand flow-next; where to apply / whether to install flow-next if they do not confirm; named repo without `.flow/`; which candidate set to install; create vs reuse builder when that choice exists; paste the two secrets. [paraphrase]
+
+If they do not confirm at orient: do not run find-repos. Ask where they want to apply this factory, and whether they want to install flow-next there. Never auto-init. [user]
+
+After the owner is on the path, install mechanics stay fn-2. Discover can stay. The new work is conversation-first. Program changes only if needed. [user]
 
 Program tests stay stubbed bun test and do not prove conversation or install. [user]
 
@@ -138,14 +106,15 @@ Two e2e cases, documented not run in this spec: [user]
 
 Throwaway product repo only. Do not arm live factory-wake. Shared computer and GitHub are expected. [user]
 
-Live same-account e2e is AFTER the skill ships, not this spec's implement now. This spec's implement-now is the skill plus a short README beat. [user]
+Live same-account e2e is AFTER the skill ships. This spec's implement-now is the skill plus a short README beat. [user]
 
 ## Edge Cases & Constraints
 <!-- scope: technical -->
 
 - No confirm / does not understand: do not silently discover. [user]
 - Ask where to apply this factory and whether to install flow-next (`/flow-next:setup`). Never auto-init. [user]
-- Named repo without `.flow/` (after the owner is on the existing path): ask intent and whether to init flow-next. No auto-init, no silent skip. This is the existing fn-2 boundary, not new machinery. [user]
+- Named repo without `.flow/` (once the owner is on the existing path): ask intent and whether to init flow-next. No auto-init, no silent skip. This is the existing fn-2 boundary, not new machinery. [user]
+- Pause only at owner decisions; do not stop the walkthrough to lecture or to recap. [user]
 - No secrets in git: do not put routine URL, sender key, tokens, PATs, sessions, or vault paths in git. [user]
 - Never reuse the live factory builder or the live factory-wake webhook or live secrets. [user]
 - Do not arm the live factory-wake. [user]
@@ -156,52 +125,37 @@ Live same-account e2e is AFTER the skill ships, not this spec's implement now. T
 - Program tests stay stubbed bun test; they do not prove conversation or install. [user]
 - Live same-account e2e is AFTER the skill ships, not this spec's implement now. [user]
 - Keep generic in spec prose (owner / GitHub / builder / notify). Instance names stay out of the spec file. [user]
-- Do not implement product code in this capture. Spec only. [user]
-- Ready remains false. [user]
+- Ready remains false. Do not implement product code in this capture. Spec only. [user]
 
 ## Acceptance Criteria
 <!-- scope: both -->
 
-- **R1:** Easy-install's first step is the flow-next understanding check: explain that this factory only works with flow-next (product repos that have flow-next / `.flow/` specs). [user] Errors: starting with silent discover, or assuming the owner already knows flow-next, fails this criterion.
+Standing constraints that already live in Boundaries (secrets not in git, do not reopen fn-2, stubbed bun tests are not conversation proof) are not restated as R-IDs. [paraphrase]
 
-- **R2:** If the owner confirms they understand, discover flow-next repos with the existing `bun factory/discover.ts` path and continue the existing confirm-then-install Action path (factory-forward GitHub Action + two secrets, one builder webhook, not Settings hooks). [user] Errors: skipping discover after confirm, or taking a different install path, fails this criterion.
+- **R1:** The whole setup is a short-beat walkthrough, in this order: orient (this factory only works with flow-next / `.flow/` specs), find repos, you pick, builder/webhook, paste two secrets, done. Each beat is one short why, then the action. Pause only when the owner needs to decide. No lecture at the start, no recap novel at the end. [user] Errors: starting with silent discover, assuming the owner already knows flow-next, opening with a lecture, a long closing recap, omitting a beat, reordering so discover runs before orient, extra pauses that are not owner decisions, or running a mutating beat with no why, fails this criterion.
+
+- **R2:** If the owner confirms they understand, continue the remaining beats using the existing discover program and the existing confirm-then-install Action path (factory-forward GitHub Action + two secrets, one builder webhook, not Settings hooks). [user] Errors: skipping discover after confirm, or taking a different install path, fails this criterion.
 
 - **R3:** If the owner does not confirm: do not silently discover. Ask where they want to apply this factory, and whether they want to install flow-next there (`/flow-next:setup`). Never auto-init. [user] Errors: silent discover, auto-init of flow-next / `.flow/`, or skipping that ask, fails this criterion.
 
 - **R4:** Named repo without `.flow/`: same ask (where to apply / whether to install flow-next), never skip silently, never auto-init. [user] Errors: silent skip or auto-init of a named repo without `.flow/` fails this criterion.
 
-- **R5:** After that onboard gate, the rest of easy-install is unchanged: confirm set, one builder webhook, factory-forward GitHub Action + two secrets, not Settings hooks. [user] Errors: changing the confirm-set, minting a second builder webhook on the live factory, using Settings hooks, or a different secrets path, fails this criterion.
+- **R5:** After the owner is on the path, install mechanics stay unchanged: confirm set, one builder webhook, factory-forward GitHub Action + two secrets, not Settings hooks. [user] Errors: changing the confirm-set, minting a second builder webhook on the live factory, using Settings hooks, or a different secrets path, fails this criterion.
 
-- **R6:** Deliverable is the skill plus a short README beat. Program changes only if needed (discover can stay; the new branch is conversation-first). [user] Errors: replacing discover as the new first step, or shipping the onboard gate as a silent program-only change with no conversation, fails this criterion.
+- **R6:** Deliverable is the skill plus a short README beat. Program changes only if needed (discover can stay; the new work is conversation-first). Live same-account e2e is AFTER the skill ships, not this spec's implement now. [user] Errors: replacing discover as the new first step, shipping the walkthrough as a silent program-only change with no conversation, or treating live e2e as implement-now, fails this criterion.
 
-- **R7:** Routine URL, sender key, tokens, PATs, sessions, and vault paths are not written to git. [user] Errors: reject any change that embeds them.
-
-- **R8:** Do not reopen fn-2-easy-install-setup (status=done). [user] Errors: rewriting or reopening fn-2-easy-install-setup, or restating its shipping contracts as new work, fails this criterion.
-
-- **R9:** Program tests stay stubbed bun test. They do not prove conversation or install. [user] Errors: treating program tests as conversation proof or install proof fails this criterion.
-
-- **R10:** Same-account test env (no second login): a second main on the same account, new builder or reuse a designated test builder, never the live factory. Never reuse the live factory builder or the live factory-wake webhook or live secrets. [user] Errors: requiring a second login, reusing the live factory builder, reusing the live factory-wake webhook, or reusing live secrets, fails this criterion.
-
-- **R11:** Two e2e cases are documented, not run in this spec. [user] Errors: omitting either documented case, or treating live e2e as this spec's implement-now, fails this criterion.
-
-- **R12:** No-builder case (documented later proof): create a new builder + webhook; live teammates do not count as an existing builder. [user] Errors: treating live teammates as an existing builder, or failing to document creating a new builder + webhook for the no-builder case, fails this criterion.
-
-- **R13:** Existing-builder case (documented later proof): reuse a designated test builder only; do not create a third; never the live factory builder. [user] Errors: documenting creation of a third builder, or using the live factory builder, fails this criterion.
-
-- **R14:** Throwaway product repo only. Do not arm live factory-wake. Shared computer and GitHub are expected. [user] Errors: arming the live factory-wake, omitting the throwaway product repo, or requiring a second login / second computer, fails this criterion.
-
-- **R15:** Live same-account e2e is AFTER the skill ships, not this spec's implement now. This spec's implement-now is the skill plus a short README beat. [user] Errors: treating live same-account e2e as implement-now work of this spec fails this criterion.
-
-- **R16:** Ready remains false. Do not implement product code in this capture. Spec only. [user] Errors: marking this spec ready, or implementing product code in this capture, fails this criterion.
+- **R7:** Same-account later-proof is documented, not run in this spec: a second main on the same account (no second login); no-builder creates a new builder + webhook (live teammates do not count); existing-builder reuses a designated test builder only (no third, never the live factory builder); throwaway product repo only; never reuse the live factory builder, live factory-wake webhook, or live secrets; do not arm live factory-wake; shared computer and GitHub are expected. [user] Errors: omitting either documented case, requiring a second login or second computer, treating live teammates as an existing builder, documenting a third builder, or using the live factory builder / wake / secrets, fails this criterion.
 
 ## Boundaries
 <!-- scope: business -->
 
 - Out of scope: reopening fn-2-easy-install-setup (status=done). Cite it as depends-on only. [user]
 - Out of scope: factory runtime (fn-1, already shipping). This spec does not reopen those. [user]
-- Out of scope: changing the post-understanding easy-install path (discover-then-confirm, one builder webhook for all Actions, factory-forward GitHub Action, owner-paste of the two existing workflow secrets, not Settings hooks). Those stay fn-2. [user]
+- Out of scope: changing the post-understanding easy-install fire path (discover-then-confirm, one builder webhook for all Actions, factory-forward GitHub Action, owner-paste of the two existing workflow secrets, not Settings hooks). Those stay fn-2. [user]
 - Out of scope: auto-init of flow-next / `.flow/`. [user]
 - Out of scope: silent discover when the owner does not confirm they understand. [user]
+- Out of scope: a lecture-style opening or a recap-novel close. [user]
+- Out of scope: extra pauses that are not owner decisions. [user]
 - Out of scope: inventing extra product machinery beyond the conversation-named discover path, `/flow-next:setup`, and `.flow/`. [paraphrase]
 - Out of scope: implementing product code in this capture (spec only). [user]
 - Out of scope: putting secrets in git (routine URL, sender key, tokens, PATs, sessions, vault paths). [user]
@@ -219,11 +173,15 @@ Live same-account e2e is AFTER the skill ships, not this spec's implement now. T
 ### Motivation
 <!-- scope: business -->
 
-Easy-install currently reads as if the owner already knows flow-next. The first step must be that understanding check so the factory is not applied by silent discover to repos the owner did not mean as flow-next product repos. [user]
+Easy-install currently reads as if the owner already knows flow-next. The first beat must be that understanding check so the factory is not applied by silent discover to repos the owner did not mean as flow-next product repos. [user]
 
-If they confirm, reuse existing discover and the existing confirm-then-install Action path — success is the onboard gate, not a new fire path. [user]
+That check is not the whole job. Success is a nice, smooth walkthrough of the whole setup: enough explanation, not over-explanation. [user]
+
+If they confirm, reuse existing discover and the existing confirm-then-install Action path — success is the conversation, not a new fire path. [user]
 
 If they do not confirm: ask where they want to apply the factory, and offer `/flow-next:setup`. Never auto-init. [user]
+
+Whole setup as short beats: orient, find repos, you pick, builder/webhook, paste two secrets, done. Each beat is one short why, then the action. Pause only when the owner needs to decide. No lecture at the start, no recap novel at the end. [user]
 
 Conversation-first is more important than program changes: skill + short README; discover can stay; program changes only if needed. [user]
 
@@ -254,12 +212,3 @@ Ready remains false. Do not implement. [user]
 | R5 | fn-3.M (TBD — populate via /flow-next:plan) |
 | R6 | fn-3.M (TBD — populate via /flow-next:plan) |
 | R7 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R8 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R9 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R10 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R11 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R12 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R13 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R14 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R15 | fn-3.M (TBD — populate via /flow-next:plan) |
-| R16 | fn-3.M (TBD — populate via /flow-next:plan) |
