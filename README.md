@@ -47,7 +47,7 @@ No “picked up”, no “still running”, no “PR opened”.
 Send this repo to your **main** Grok Bot agent. Easy-install is optional and not required; hand-wire (Wake) remains valid. Each beat is one short why, then the action.
 
 1. **Orient** — This factory only works with flow-next (product repos with `.flow/` specs). Confirm you understand before anyone lists repos. If you do not: say where to apply it and whether to install flow-next (`/flow-next:setup`). Do not auto-init. Do not fleet-discover.
-2. **Find repos** — After that confirm, list flow-next product repos (`bun factory/discover.ts`). Empty list: wait for a named repo or stop.
+2. **Find repos** — Confirmed owners get a list of flow-next product repos. Run `bun factory/discover.ts`. Empty list: wait for a named repo or stop.
 3. **You pick** — You choose the set. Named repo without `.flow/`: ask intent and whether `/flow-next:setup`; never auto-init, never silent skip. Wait for an explicit confirmation reply naming the set.
 4. **Builder/webhook** — One builder, one webhook for all Actions. Assign an existing builder; create one only if none exists. Do not mint a second routine.
 5. **Paste two secrets** — GitHub never shows secret values. Paste `GROK_BOT_WEBHOOK_URL` and `GROK_BOT_SENDER_KEY` from the routine panel, then install the factory-forward Action on the confirmed set. Not Settings hooks.

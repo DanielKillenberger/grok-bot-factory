@@ -11,7 +11,8 @@
   ],
   "id": "fn-3-easy-install-flow-next-onboard",
   "impl_review_rounds": {
-    "fn-3-easy-install-flow-next-onboard.1": 0
+    "fn-3-easy-install-flow-next-onboard.1": 0,
+    "fn-3-easy-install-flow-next-onboard.2": 1
   },
   "next_task": 1,
   "plan_review_rounds": 0,
@@ -161,5 +162,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-27T19:42:34.353431Z"
+  "updated_at": "2026-08-27T19:44:33.892092Z"
 }

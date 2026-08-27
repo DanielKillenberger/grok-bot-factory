@@ -256,6 +256,15 @@ const README_EASY_INSTALL_BEATS = [
   "Done",
 ] as const;
 
+const README_BEAT_ACTION: Record<(typeof README_EASY_INSTALL_BEATS)[number], RegExp> = {
+  Orient: /Confirm you understand/,
+  "Find repos": /bun factory\/discover\.ts/,
+  "You pick": /Wait for an explicit confirmation reply/,
+  "Builder/webhook": /Assign an existing builder/,
+  "Paste two secrets": /Paste `GROK_BOT_WEBHOOK_URL`/,
+  Done: /Stop\. Do not recap/,
+};
+
 test("README contracts", () => {
   const readme = readFileSync(join(ROOT, "README.md"), "utf8");
   const changelog = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
@@ -273,27 +282,37 @@ test("README contracts", () => {
   expect(/don't arm|does not arm|do not arm/i.test(changelog)).toBe(true);
 
   const easy = readme.split("## Easy-install")[1]?.split(/^## /m)[0] ?? "";
-  let last = -1;
-  for (const title of README_EASY_INSTALL_BEATS) {
-    const idx = easy.search(new RegExp(`\\*\\*${title.replace(/[\\/]/g, "\\$&")}\\*\\*`));
-    expect(idx, title).toBeGreaterThan(last);
-    last = idx;
-    const rest = easy.slice(idx);
-    const item = rest.split(/\n(?=\d+\. |\n- |\n## |$)/)[0] ?? "";
-    expect(item, `${title} why then action`).toMatch(/—.{10,}./);
+  const numbered = [
+    ...easy.matchAll(/^\d+\.\s+\*\*([^*]+)\*\*\s+—\s+(\S.*)$/gm),
+  ];
+  expect(numbered.map((m) => m[1])).toEqual([...README_EASY_INSTALL_BEATS]);
+  for (const m of numbered) {
+    const title = m[1] as (typeof README_EASY_INSTALL_BEATS)[number];
+    const body = m[2] ?? "";
+    const why = body.split(/(?<=\.)\s+/)[0] ?? "";
+    const action = body.slice(why.length).trim();
+    expect(why, `${title} why`).toMatch(/[A-Za-z].{10,}/);
+    expect(action, `${title} action`).toMatch(/[A-Za-z].{10,}/);
+    expect(action, `${title} expected action`).toMatch(README_BEAT_ACTION[title]);
   }
   expect(changelog.toLowerCase()).toMatch(/walkthrough|short-beat/);
   expect(changelog.toLowerCase()).toMatch(/conversation-first/);
   expect(easy.toLowerCase()).toMatch(/later-proof/);
+  expect(easy.toLowerCase()).toMatch(/after the skill ships/);
   expect(easy).toMatch(/No-builder/);
   expect(easy).toMatch(/Existing-builder/);
+  expect(easy.toLowerCase()).toMatch(/create a new builder \+ webhook/);
   expect(easy.toLowerCase()).toMatch(/live teammates do not count/);
   expect(easy.toLowerCase()).toMatch(/designated test builder/);
+  expect(easy.toLowerCase()).toMatch(/do not create a third/);
   expect(easy.toLowerCase()).toMatch(/never the live factory builder/);
+  expect(easy.toLowerCase()).toMatch(/live factory-wake webhook/);
+  expect(easy.toLowerCase()).toMatch(/live secrets/);
   expect(easy.toLowerCase()).toMatch(/do not arm live factory-wake/);
   expect(easy.toLowerCase()).toMatch(/no second login/);
   expect(easy.toLowerCase()).toMatch(/throwaway product repo/);
   expect(easy.toLowerCase()).toMatch(/second main/);
+  expect(easy.toLowerCase()).toMatch(/shared computer and github/);
 });
 
 test("no live hook or eval in notify", () => {
