@@ -1,7 +1,7 @@
 {
   "branch_name": "fn-2-easy-install-action",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-08-27T07:07:14.150061Z",
   "created_at": "2026-08-23T20:51:08.195421Z",
   "default_impl": null,
   "default_review": null,
@@ -362,17 +362,61 @@
       "task": "fn-2-easy-install-setup.2",
       "timestamp": "2026-08-27T07:05:26.666216Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "e3f724df222bc30c5b839e532d2a9e034dcccd61e494d3917f3eb78a8aa0ced0",
+      "backend": "cursor",
+      "base_sha": "04f9480049bcabdf4d2def678439e4f37bb3cc21",
+      "counter_kind": "plan",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "cursor",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-5e78a3f0a211175bf2c760c9fcd3d429",
+            "classification": "introduced",
+            "findingId": "finding-5e78a3f0a211175bf2c760c9fcd3d429",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 1,
+      "head_sha": "9c6d47311a3423da2e176b137acc4dffab1c6e91",
+      "head_sha_observed": true,
+      "kind": "completion",
+      "model": "gpt-5.6-sol-high",
+      "outcome": "verdict",
+      "output_bytes": 4831,
+      "output_sha256": "bb88887f125627c19b7208162f0c2bac616dfb8790db8ac809dc5dc14546660e",
+      "reservation_id": "ad3b45ed3cd642e3a3f3dbc185de68ad",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-08-27T07:07:14.147306Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:fn-2-easy-install-setup.1": 1,
     "impl:fn-2-easy-install-setup.2": 1,
     "plan": 3,
-    "plan#completion": 1
+    "plan#completion": 2
   },
   "review_pending_rounds": {},
   "review_reservations": {},
   "review_transport_failures": {
+    "completion": 0,
     "impl:fn-2-easy-install-setup.1": 0,
     "impl:fn-2-easy-install-setup.2": 0,
     "plan": 0
@@ -391,5 +435,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-27T07:05:26.668046Z"
+  "updated_at": "2026-08-27T07:07:14.150387Z"
 }
