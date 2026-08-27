@@ -210,6 +210,25 @@ test("whitelist miss is quiet and does not probe GitHub", async () => {
   expect(log.trim()).toBe("");
 });
 
+test("envelope User-Agent recovers identity and starts", async () => {
+  const res = await runGate([join(FIX, "envelope-ok.json")], "pilot");
+  expect(res.code).toBe(10);
+  expect(trimNL(res.stdout)).toBe(`acme/app ${SHA} pilot`);
+});
+
+test("envelope without User-Agent is stuck not quiet", async () => {
+  const res = await runGate([join(FIX, "envelope-no-ua.json")], "pilot");
+  expect(res.code).toBe(20);
+  expect(res.stderr).toMatch(/identity:/);
+  expect(trimNL(res.stdout)).toBe("");
+});
+
+test("malformed factory-forward User-Agent is stuck", async () => {
+  const res = await runGate([join(FIX, "envelope-bad-ua.json")], "pilot");
+  expect(res.code).toBe(20);
+  expect(res.stderr).toMatch(/identity:/);
+});
+
 test("whitelist hit starts", async () => {
   const res = await runGate(["--whitelist", "acme/app", join(FIX, "push-ok.json")], "pilot");
   expect(res.code).toBe(10);

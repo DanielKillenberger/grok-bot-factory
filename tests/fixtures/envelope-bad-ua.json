@@ -1,0 +1,7 @@
+{
+  "headers": {
+    "User-Agent": "factory-forward repo=acme/app/typo sha=0123456789abcdef0123456789abcdef01234567 ref=refs/heads/main"
+  },
+  "body_digest": "deadbeef",
+  "timestamp_ms": 1
+}

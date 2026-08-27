@@ -5,6 +5,7 @@
 ### Added
 
 - Factory runtime: deterministic GitHub-push wake gate, isolated tick runner, and stuck/owner-gated notify (builder → main → human). The builder owns the webhook routine and execs the gate before any model. Implementing this does not arm a production wake.
+- Easy-install: send this repo to main; after confirm, converge the factory-forward GitHub Action and two Actions secrets on the confirmed set. One builder webhook routine. Native Settings webhooks are not the install path.
 
 ### Changed
 
@@ -16,3 +17,4 @@
 - `hostRun` session jsonl watch only accepts a verdict from records with `type==="assistant"` (JSON-parse each line; skip parse failures and `tool_result` / `user` / `reasoning`). Real verdicts are a terminal line in `assistant.content`. Typescript / PTY stay raw-text. The `spec=` / `prs=` regex is unchanged.
 - Tick stuck reasons for a nonzero host exit include the host's first trimmed stderr line, or the first non-verdict PTY/stdout line when script wraps grok.
 - Factory program is TypeScript on Bun (not bash). Gate, tick, and notify stay exec-able (`bun` / shebang) with the same fail-closed exits (0 quiet, 10 start, 20 stuck). Proof command is `bun test`.
+- Gate recovers wake identity from a real GitHub push body if present, else `User-Agent: factory-forward repo=<owner/name> sha=<40hex> ref=<git-ref>`, else fail closed.

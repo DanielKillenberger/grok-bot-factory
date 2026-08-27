@@ -11,6 +11,6 @@
   "spec": "fn-2-easy-install-setup",
   "spec_path": ".flow/tasks/fn-2-easy-install-setup.2.md",
   "status": "todo",
-  "title": "Builder, routine, and push hooks",
-  "updated_at": "2026-08-23T21:38:29.624563Z"
+  "title": "Builder, routine, and factory-forward Action",
+  "updated_at": "2026-08-27T06:51:55.230948Z"
 }
