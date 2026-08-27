@@ -1,0 +1,9 @@
+{
+  "headers": {
+    "X-Factory-Repo": "acme/app",
+    "X-Factory-Sha": "0123456789abcdef0123456789abcdef01234567",
+    "X-Factory-Ref": "refs/heads/main"
+  },
+  "body_digest": "deadbeef",
+  "timestamp_ms": 1
+}

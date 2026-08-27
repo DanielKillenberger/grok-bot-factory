@@ -28,6 +28,45 @@ export type ParseResult =
   | { kind: "quiet" }
   | { kind: "stuck"; reason: string };
 
+const UA_RE =
+  /factory-forward repo=([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+) sha=([0-9a-f]{40}) ref=(\S+)/;
+
+function headerUserAgent(headers: unknown): string | undefined {
+  if (isRecord(headers)) {
+    for (const [k, v] of Object.entries(headers)) {
+      if (k.toLowerCase() === "user-agent" && typeof v === "string") return v;
+    }
+    return undefined;
+  }
+  if (!Array.isArray(headers)) return undefined;
+  for (const item of headers) {
+    if (!isRecord(item)) continue;
+    const name = item.name ?? item.key;
+    const value = item.value;
+    if (
+      typeof name === "string" &&
+      name.toLowerCase() === "user-agent" &&
+      typeof value === "string"
+    ) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function fromUserAgent(ua: string): ParseResult {
+  const m = ua.match(UA_RE);
+  if (!m) return { kind: "stuck", reason: "identity: no factory-forward User-Agent" };
+  const full_name = m[1];
+  const after = m[2];
+  const ref = m[3];
+  if (!isRepoFullName(full_name) || !SHA_RE.test(after) || !okRef(ref)) {
+    return { kind: "stuck", reason: "identity: malformed factory-forward User-Agent" };
+  }
+  if (after === ZERO_SHA) return { kind: "quiet" };
+  return { kind: "ok", ident: { full_name, after, ref, deleted: false } };
+}
+
 export function parsePushBody(raw: string): ParseResult {
   let data: unknown;
   try {
@@ -52,6 +91,21 @@ export function parsePushBody(raw: string): ParseResult {
   };
 }
 
+export function parseWake(raw: string): ParseResult {
+  const push = parsePushBody(raw);
+  if (push.kind === "ok") return push;
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return push;
+  }
+  if (!isRecord(data) || !("headers" in data)) return push;
+  const ua = headerUserAgent(data.headers);
+  if (!ua) return { kind: "stuck", reason: "identity: no factory-forward User-Agent" };
+  return fromUserAgent(ua);
+}
+
 export async function readPayload(src: string | undefined): Promise<ParseResult> {
   if (src && src !== "-") {
     const file = Bun.file(src);
@@ -60,14 +114,14 @@ export async function readPayload(src: string | undefined): Promise<ParseResult>
     }
     try {
       const raw = await file.text();
-      return parsePushBody(raw);
+      return parseWake(raw);
     } catch {
       return { kind: "stuck", reason: "cannot read payload file" };
     }
   }
   try {
     const raw = await Bun.stdin.text();
-    return parsePushBody(raw);
+    return parseWake(raw);
   } catch {
     return { kind: "stuck", reason: "cannot parse payload" };
   }
