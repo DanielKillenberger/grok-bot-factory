@@ -170,6 +170,15 @@ const WALKTHROUGH_BEATS = [
   "Done",
 ] as const;
 
+const BEAT_ACTION_AFTER_WHY: Record<(typeof WALKTHROUGH_BEATS)[number], RegExp> = {
+  Orient: /Wait for them to confirm they understand/,
+  "Find repos": /bun factory\/discover\.ts/,
+  "You pick": /Wait for an explicit confirmation reply/,
+  "Builder/webhook": /Assign an existing builder/,
+  "Paste two secrets": /bun factory\/install\.ts --confirmed/,
+  Done: /Stop\. Do not recap/,
+};
+
 function beatHeading(n: number, title: string): RegExp {
   return new RegExp(`^## ${n}\\.\\s+${title.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}\\s*$`, "m");
 }
@@ -197,35 +206,46 @@ test("skill is a six-beat walkthrough that orients before discover", () => {
   const skill = readFileSync(SKILL_EASY_INSTALL, "utf8");
   const fm = skill.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? "";
   expect(fm).not.toMatch(/description:\s*.*Discover/i);
+  expect(fm).toMatch(/description:\s*.*Orient/i);
 
   let last = -1;
   for (const [i, title] of WALKTHROUGH_BEATS.entries()) {
     const idx = skill.search(beatHeading(i + 1, title));
     expect(idx, title).toBeGreaterThan(last);
     last = idx;
-    const prose = beatBody(skill, i + 1, title)
-      .replace(/^## .*$/m, "")
-      .replace(/```[\s\S]*?```/g, "")
-      .trim();
-    const firstPara = (prose.split(/\n\s*\n/)[0] ?? "").replace(/\s+/g, " ").trim();
+    const body = beatBody(skill, i + 1, title).replace(/^## .*$/m, "").trim();
+    const parts = body.split(/\n\s*\n/);
+    const firstPara = (parts[0] ?? "").replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim();
+    const afterWhy = parts.slice(1).join("\n\n");
     expect(firstPara, `${title} why`).toMatch(/[A-Za-z].{15,}/);
     expect(firstPara, `${title} not a command-only beat`).not.toMatch(/^```/);
+    expect(afterWhy, `${title} action after why`).toMatch(BEAT_ACTION_AFTER_WHY[title]);
   }
 
   const orient = skill.search(beatHeading(1, "Orient"));
+  const pause = skill.search(/Do not run discover yet/);
   const firstDiscoverFence = skill.search(/```(?:bash)?\n[^\n]*bun factory\/discover\.ts/);
   expect(orient).toBeGreaterThan(-1);
-  expect(firstDiscoverFence).toBeGreaterThan(orient);
+  expect(pause).toBeGreaterThan(orient);
+  expect(firstDiscoverFence).toBeGreaterThan(pause);
+
+  const youPick = skill.search(beatHeading(3, "You pick"));
+  const paste = skill.search(beatHeading(5, "Paste two secrets"));
+  const install = skill.search(/```(?:bash)?\n\s*bun factory\/install\.ts --confirmed/);
+  expect(install).toBeGreaterThan(paste);
+  expect(paste).toBeGreaterThan(youPick);
 });
 
 test("skill no-confirm path uses targeted named+whitelist discover, not fleet", () => {
   const skill = readFileSync(SKILL_EASY_INSTALL, "utf8");
   expect(skill).toMatch(/do not confirm/i);
+  expect(skill).toMatch(/where they want to apply this factory/);
   expect(skill).toMatch(/\/flow-next:setup/);
   expect(skill).toMatch(
     /bun factory\/discover\.ts --named owner\/name --whitelist owner\/name/,
   );
   expect(skill).toMatch(/did not return in `candidates`/);
+  expect(skill).toMatch(/named_without_flow[\s\S]{0,400}Do not install/);
 
   const fleetFence = /```(?:bash)?\n\s*bun factory\/discover\.ts\s*\n```/;
   const findRepos = skill.search(beatHeading(2, "Find repos"));
@@ -234,8 +254,25 @@ test("skill no-confirm path uses targeted named+whitelist discover, not fleet", 
   const noConfirmStart = skill.search(/do not confirm/i);
   const noConfirm = skill.slice(noConfirmStart, findRepos);
   expect(noConfirm).not.toMatch(fleetFence);
-  expect(noConfirm).toMatch(/--named owner\/name --whitelist owner\/name/);
-  expect(noConfirm).not.toMatch(/```(?:bash)?\n\s*bun factory\/discover\.ts --named owner\/name\s*\n```/);
+  const invocations = [...noConfirm.matchAll(/bun factory\/discover\.ts[^\n`]*/g)];
+  expect(invocations.length).toBeGreaterThan(0);
+  for (const m of invocations) {
+    const cmd = m[0].trim();
+    const idx = m.index ?? 0;
+    const before = noConfirm.slice(Math.max(0, idx - 48), idx);
+    if (/fleet\s*`?$/.test(before)) {
+      expect(cmd, "fleet mention is the unconstrained form being forbidden").toBe(
+        "bun factory/discover.ts",
+      );
+      continue;
+    }
+    expect(cmd, cmd).toMatch(/--named owner\/name/);
+    expect(cmd, cmd).toMatch(/--whitelist owner\/name/);
+    expect(cmd, cmd).not.toMatch(/--owner\b/);
+    const named = cmd.match(/--named\s+(\S+)/)?.[1];
+    const whitelist = cmd.match(/--whitelist\s+(\S+)/)?.[1];
+    expect(whitelist, "whitelist matches named").toBe(named);
+  }
 });
 
 test("no hardcoded allowlist in discover sources", () => {
