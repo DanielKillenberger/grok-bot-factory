@@ -1,6 +1,12 @@
-const NAME_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+export const REPO_FULL_NAME_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SHA_RE = /^[0-9a-f]{40}$/;
 const ZERO_SHA = "0000000000000000000000000000000000000000";
+
+export function isRepoFullName(s: string): boolean {
+  if (!REPO_FULL_NAME_RE.test(s)) return false;
+  const [owner, repo] = s.split("/");
+  return owner !== "." && owner !== ".." && repo !== "." && repo !== "..";
+}
 
 export type PushIdentity = {
   full_name: string;
@@ -33,7 +39,7 @@ export function parsePushBody(raw: string): ParseResult {
   if (typeof data.zen === "string" && !("after" in data)) return { kind: "quiet" };
   if (!isRecord(data.repository)) return { kind: "quiet" };
   const full_name = data.repository.full_name;
-  if (typeof full_name !== "string" || !NAME_RE.test(full_name)) return { kind: "quiet" };
+  if (typeof full_name !== "string" || !isRepoFullName(full_name)) return { kind: "quiet" };
   const after = data.after;
   if (typeof after !== "string" || !SHA_RE.test(after)) return { kind: "quiet" };
   if (!okRef(data.ref)) return { kind: "quiet" };
