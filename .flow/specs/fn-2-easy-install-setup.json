@@ -422,7 +422,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/fn-2-easy-install-setup.md",
-  "status": "open",
+  "status": "done",
   "title": "Easy-install setup",
   "tracker": {
     "baseHashFlow": null,
@@ -435,5 +435,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-27T07:07:14.150387Z"
+  "updated_at": "2026-08-27T08:01:37.423132Z"
 }
