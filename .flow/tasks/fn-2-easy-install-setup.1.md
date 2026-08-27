@@ -52,9 +52,11 @@ Conversational discovery for easy-install (R1, R3, R5): list `.flow/` candidates
 - [ ] No Settings-hook REST (`POST/PATCH /repos/{owner}/{repo}/hooks`) on this path
 
 ## Done summary
-TBD
+Discover-then-confirm: paginated `gh repo list` + `.flow/` Contents probe, fail-closed incomplete scans, named no-`.flow/` ask, skill waits for confirm before `factory/install.ts`. Owner/name validation exported from `github_push.ts`. Tests stub gh; no live arm.
 
+stage: impl-review - ran (model: gpt-5.6-sol-high) verdict=SHIP
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 9773bbd44839e0979c605be8fa988277175a423c
+- Tests: bun test tests/factory/discover.test.ts, bun test
 - PRs:
