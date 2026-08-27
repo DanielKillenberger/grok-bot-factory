@@ -44,11 +44,13 @@
 
 > user (turn 20, confirmed option): orient (this factory only works with flow-next), find repos, you pick, builder/webhook, paste two secrets, done. Each beat is one short why, then the action. Pause only when you need to decide. No lecture at the start, no recap novel at the end.
 
+> user (turn 21): "After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. This belongs in the easy-install skill AND the short README beat (install instructions), not only John's wake prompt."
+
 ## Overview
 
 Easy-install currently starts at discover, as if the owner already knows flow-next. This spec reshapes the **conversation** into a short-beat walkthrough of the whole setup: orient, find repos, you pick, builder/webhook, paste two secrets, done. Each beat is one short why, then the action. Pause only at owner decisions.
 
-Install mechanics stay the fn-2 fire path. Discover can stay. The deliverable is the easy-install skill plus a short README beat. Program changes only if a beat cannot be expressed in the skill.
+Install mechanics stay the fn-2 fire path. Discover can stay. The deliverable is the easy-install skill plus a short README beat. Program changes only if a beat cannot be expressed in the skill. The skill and that short README beat (install instructions) also document: after every factory tick, if the tree moved, commit (if needed) and push to the spec branch; ADVANCED with a dirty or unpushed tree is a fail, not quiet success — not only the wake prompt. [user]
 
 Depends on `fn-2-easy-install-setup` (done). Does not reopen fn-1 factory runtime.
 
@@ -76,6 +78,8 @@ Program tests stay stubbed bun test. They do not prove conversation or install. 
 Same-account test env (no second login): a second main on the same account, new builder or reuse a designated test builder, never the live factory. Never reuse the live factory builder or the live factory-wake webhook or live secrets. Throwaway product repo only. Do not arm live factory-wake. Shared computer and GitHub are expected. [user]
 
 Two e2e cases are documented later-proof to run AFTER the skill ships, not this spec's implement now. [user]
+
+After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. This belongs in the easy-install skill and the short README beat (install instructions), not only the wake prompt. [user]
 
 ## Approach
 
@@ -146,6 +150,8 @@ Throwaway product repo only. Do not arm live factory-wake. Shared computer and G
 
 Live same-account e2e is AFTER the skill ships. This spec's implement-now is the skill plus a short README beat. [user]
 
+After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. Document this in the easy-install skill and the short README beat (install instructions), not only the wake prompt. [user]
+
 ## Edge Cases & Constraints
 <!-- scope: technical -->
 
@@ -168,6 +174,9 @@ Live same-account e2e is AFTER the skill ships. This spec's implement-now is the
 - Program tests stay stubbed bun test; they do not prove conversation or install. [user]
 - Live same-account e2e is AFTER the skill ships, not this spec's implement now. [user]
 - Keep generic in spec prose (owner / GitHub / builder / notify). Instance names stay out of the spec file. [user]
+- After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. [user]
+- ADVANCED with a dirty or unpushed tree is a fail, not quiet success. [user]
+- This instruction belongs in the easy-install skill and the short README beat (install instructions), not only the wake prompt. [user]
 
 ## Acceptance Criteria
 <!-- scope: both -->
@@ -187,6 +196,8 @@ Standing constraints that already live in Boundaries (secrets not in git, do not
 - **R6:** Deliverable is the skill plus a short README beat. Program changes only if needed (discover can stay; the new work is conversation-first). Live same-account e2e is AFTER the skill ships, not this spec's implement now. [user] Errors: replacing discover as the new first step, shipping the walkthrough as a silent program-only change with no conversation, or treating live e2e as implement-now, fails this criterion.
 
 - **R7:** Same-account later-proof is documented, not run in this spec: a second main on the same account (no second login); no-builder creates a new builder + webhook (live teammates do not count); existing-builder reuses a designated test builder only (no third, never the live factory builder); throwaway product repo only; never reuse the live factory builder, live factory-wake webhook, or live secrets; do not arm live factory-wake; shared computer and GitHub are expected. [user] Errors: omitting either documented case, requiring a second login or second computer, treating live teammates as an existing builder, documenting a third builder, or using the live factory builder / wake / secrets, fails this criterion.
+
+- **R8:** After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. This belongs in the easy-install skill AND the short README beat (install instructions), not only the wake prompt. [user] Errors: treating a dirty or unpushed tree as quiet success after ADVANCED, or documenting this only on the wake prompt and omitting it from the easy-install skill or the short README beat, fails this criterion.
 
 ## Early proof point
 
@@ -212,6 +223,8 @@ Task fn-3-easy-install-flow-next-onboard.1 proves the core approach (the skill c
 - Out of scope: putting instance names in the spec file. Product-role prose stays generic (owner / GitHub / builder / notify). The test-env sentence is: a second main on the same account, new builder or reuse a designated test builder, never the live factory. [user]
 - Out of scope: rewriting `factory/discover.ts` as the new first step, a new orient program, or a clicks-only UI. [paraphrase]
 - Out of scope: changing `skills/factory-builder/SKILL.md` or the Wake/hand-wire path except to keep existing README contracts.
+- Out of scope: treating ADVANCED with a dirty or unpushed tree as quiet success. [user]
+- Out of scope: documenting the post-tick commit-and-push instruction only on the wake prompt. It belongs in the easy-install skill and the short README beat (install instructions). [user]
 
 ## Decision Context
 <!-- scope: both -->
@@ -245,6 +258,8 @@ Live same-account e2e is AFTER the skill ships, not this spec's implement now. [
 
 Keep generic in spec prose (owner / GitHub / builder / notify). Instance names stay out of the spec file. [user]
 
+After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. This belongs in the easy-install skill and the short README beat (install instructions), not only the wake prompt. [user]
+
 ### Plan decisions
 
 - Rejected making `factory/discover.ts` the new first step: the owner would still hit silent discover before they understand flow-next. Orient is a skill pause.
@@ -273,6 +288,7 @@ bun test
 | R5  | Install mechanics stay fn-2 after the owner is on the path | fn-3-easy-install-flow-next-onboard.1 | — |
 | R6  | Skill + short README beat; program changes only if needed; e2e not implement-now | fn-3-easy-install-flow-next-onboard.1, fn-3-easy-install-flow-next-onboard.2 | — |
 | R7  | Same-account later-proof documented, not run | fn-3-easy-install-flow-next-onboard.2 | — |
+| R8  | After every factory tick, if the tree moved, commit (if needed) and push to the spec branch; ADVANCED with a dirty or unpushed tree is a fail; document in the easy-install skill AND the short README beat, not only the wake prompt | — | spec-only fold; leftover plan/tasks already shipped this pass and not rewritten. |
 
 ## References
 
