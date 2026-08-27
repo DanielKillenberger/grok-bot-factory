@@ -5,7 +5,7 @@
 ### Added
 
 - Factory runtime: deterministic GitHub-push wake gate, isolated tick runner, and stuck/owner-gated notify (builder → main → human). The builder owns the webhook routine and execs the gate before any model. Implementing this does not arm a production wake.
-- Easy-install: send this repo to main; after confirm, converge the factory-forward GitHub Action and two Actions secrets on the confirmed set. One builder webhook routine. Native Settings webhooks are not the install path.
+- Easy-install: short-beat walkthrough (orient → find repos → you pick → builder/webhook → paste two secrets → done). Conversation-first; fire path unchanged (confirm set, one builder webhook, factory-forward Action + two secrets, not Settings hooks).
 
 ### Changed
 

@@ -44,11 +44,21 @@ No “picked up”, no “still running”, no “PR opened”.
 
 ## Easy-install
 
-Send this repo to your **main** Grok Bot agent. Main assigns an existing builder (creates one only if none exists), lists `.flow/` candidates, waits for confirm, then creates the builder’s webhook routine if missing and converges the factory-forward Action plus the two secrets on the confirmed set. After that fire path exists, ticks are the factory program above.
+Send this repo to your **main** Grok Bot agent. Easy-install is optional and not required; hand-wire (Wake) remains valid. Each beat is one short why, then the action.
 
-Hand-wire (Wake) remains valid. Easy-install is optional and not required.
+1. **Orient** — This factory only works with flow-next (product repos with `.flow/` specs). Confirm you understand before anyone lists repos. If you do not: say where to apply it and whether to install flow-next (`/flow-next:setup`). Do not auto-init. Do not fleet-discover.
+2. **Find repos** — After that confirm, list flow-next product repos (`bun factory/discover.ts`). Empty list: wait for a named repo or stop.
+3. **You pick** — You choose the set. Named repo without `.flow/`: ask intent and whether `/flow-next:setup`; never auto-init, never silent skip. Wait for an explicit confirmation reply naming the set.
+4. **Builder/webhook** — One builder, one webhook for all Actions. Assign an existing builder; create one only if none exists. Do not mint a second routine.
+5. **Paste two secrets** — GitHub never shows secret values. Paste `GROK_BOT_WEBHOOK_URL` and `GROK_BOT_SENDER_KEY` from the routine panel, then install the factory-forward Action on the confirmed set. Not Settings hooks.
+6. **Done** — The fire path exists; ticks are the factory program above. Stop. Do not recap.
 
 Main supervises setup only. The routine’s first action is still `bun factory/gate.ts` (no model), then `factory/tick.ts` with the instance host CLI. Do not overwrite a product repo’s flow-next:setup review pin.
+
+Later-proof (document now, run after the skill ships). Same-account: a second main on the same account, throwaway product repo, shared computer and GitHub, no second login. Do not arm live factory-wake. Never reuse the live factory builder, the live factory-wake webhook, or live secrets.
+
+- **No-builder:** create a new builder + webhook. Live teammates do not count as an existing builder.
+- **Existing-builder:** reuse a designated test builder only; do not create a third; never the live factory builder.
 
 ## Footnotes (not the path)
 

@@ -247,6 +247,15 @@ test("builder skill contract", () => {
   expect(/you own the webhook routine/i.test(skill) || /builder owns/i.test(skill)).toBe(true);
 });
 
+const README_EASY_INSTALL_BEATS = [
+  "Orient",
+  "Find repos",
+  "You pick",
+  "Builder/webhook",
+  "Paste two secrets",
+  "Done",
+] as const;
+
 test("README contracts", () => {
   const readme = readFileSync(join(ROOT, "README.md"), "utf8");
   const changelog = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
@@ -262,6 +271,29 @@ test("README contracts", () => {
   expect(readme.toLowerCase()).toContain("review pin");
   expect(readme.toLowerCase()).toContain("do not arm");
   expect(/don't arm|does not arm|do not arm/i.test(changelog)).toBe(true);
+
+  const easy = readme.split("## Easy-install")[1]?.split(/^## /m)[0] ?? "";
+  let last = -1;
+  for (const title of README_EASY_INSTALL_BEATS) {
+    const idx = easy.search(new RegExp(`\\*\\*${title.replace(/[\\/]/g, "\\$&")}\\*\\*`));
+    expect(idx, title).toBeGreaterThan(last);
+    last = idx;
+    const rest = easy.slice(idx);
+    const item = rest.split(/\n(?=\d+\. |\n- |\n## |$)/)[0] ?? "";
+    expect(item, `${title} why then action`).toMatch(/—.{10,}./);
+  }
+  expect(changelog.toLowerCase()).toMatch(/walkthrough|short-beat/);
+  expect(changelog.toLowerCase()).toMatch(/conversation-first/);
+  expect(easy.toLowerCase()).toMatch(/later-proof/);
+  expect(easy).toMatch(/No-builder/);
+  expect(easy).toMatch(/Existing-builder/);
+  expect(easy.toLowerCase()).toMatch(/live teammates do not count/);
+  expect(easy.toLowerCase()).toMatch(/designated test builder/);
+  expect(easy.toLowerCase()).toMatch(/never the live factory builder/);
+  expect(easy.toLowerCase()).toMatch(/do not arm live factory-wake/);
+  expect(easy.toLowerCase()).toMatch(/no second login/);
+  expect(easy.toLowerCase()).toMatch(/throwaway product repo/);
+  expect(easy.toLowerCase()).toMatch(/second main/);
 });
 
 test("no live hook or eval in notify", () => {

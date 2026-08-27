@@ -231,8 +231,8 @@ test("skill is a six-beat walkthrough that orients before discover", () => {
 
   const youPick = skill.search(beatHeading(3, "You pick"));
   const paste = skill.search(beatHeading(5, "Paste two secrets"));
-  const install = skill.search(/```(?:bash)?\n\s*bun factory\/install\.ts --confirmed/);
-  expect(install).toBeGreaterThan(paste);
+  const installFence = skill.search(/```(?:bash)?\n[^\n]*bun factory\/install\.ts --confirmed/);
+  expect(installFence).toBeGreaterThan(paste);
   expect(paste).toBeGreaterThan(youPick);
 });
 
@@ -254,18 +254,12 @@ test("skill no-confirm path uses targeted named+whitelist discover, not fleet", 
   const noConfirmStart = skill.search(/do not confirm/i);
   const noConfirm = skill.slice(noConfirmStart, findRepos);
   expect(noConfirm).not.toMatch(fleetFence);
-  const invocations = [...noConfirm.matchAll(/bun factory\/discover\.ts[^\n`]*/g)];
+  const invocations = [
+    ...noConfirm.matchAll(/```(?:bash)?\n([^\n]*bun factory\/discover\.ts[^\n]*)\n```/g),
+  ];
   expect(invocations.length).toBeGreaterThan(0);
   for (const m of invocations) {
-    const cmd = m[0].trim();
-    const idx = m.index ?? 0;
-    const before = noConfirm.slice(Math.max(0, idx - 48), idx);
-    if (/fleet\s*`?$/.test(before)) {
-      expect(cmd, "fleet mention is the unconstrained form being forbidden").toBe(
-        "bun factory/discover.ts",
-      );
-      continue;
-    }
+    const cmd = (m[1] ?? "").trim();
     expect(cmd, cmd).toMatch(/--named owner\/name/);
     expect(cmd, cmd).toMatch(/--whitelist owner\/name/);
     expect(cmd, cmd).not.toMatch(/--owner\b/);

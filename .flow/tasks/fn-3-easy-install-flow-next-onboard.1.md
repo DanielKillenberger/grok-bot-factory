@@ -58,9 +58,8 @@ Rewrite the easy-install skill as the six-beat walkthrough (R1–R5, skill half 
 - [ ] Discover/install/factory-builder sources unchanged unless a beat was inexpressible (default: unchanged)
 - [ ] No secrets in git; no Settings-hook REST; no `factory/hooks.ts`
 ## Done summary
-TBD
-
+Rewrote easy-install as a six-beat walkthrough that pauses at understand-confirm. No-confirm uses targeted --named + --whitelist discover and never installs a non-candidates name. Document-contract tests fail on the old discover-first skill and keep fn-2 fixture phrases. Cursor impl-review SHIP.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: ed43d984f1c78052691599fb973ef95efa6b5d9f, 524645a17e39e9a51d3f6f19e5d9a1859bf6f5b7
+- Tests: bun test tests/factory/discover.test.ts tests/factory/install.test.ts, bun test
 - PRs:
