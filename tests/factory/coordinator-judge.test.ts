@@ -161,10 +161,14 @@ test("escalate clears the lease and disables the check", async () => {
     firingRepo: "acme/app",
     specId: "fn-1",
     verdict: judgeStay({ readable: true, stuck: true }),
-    readyInFiringRepo: [],
+    readyInFiringRepo: [
+      { specId: "fn-1", fields: firstLaunch, ref: { kind: "spec-branch", branch: "fn-1" } },
+      { specId: "fn-2", fields: firstLaunch, ref: { kind: "spec-branch", branch: "fn-2" } },
+    ],
     canLaunch: true,
-    post: async () => {
-      throw new Error("escalate must not launch");
+    post: async (payload) => {
+      expect(payload.source.ref).not.toBe("fn-1");
+      return { runId: `run-${payload.source.ref}` };
     },
   });
   expect(done.action).toBe("ping");
@@ -172,6 +176,8 @@ test("escalate clears the lease and disables the check", async () => {
   expect(done.checkDisabled).toBe(true);
   expect(readLedgerFile(botPaths(home).ledger).leases["acme/app fn-1"]).toBeUndefined();
   expect(readCheckRoutine(home, checkId)).toBeNull();
+  expect(done.filled.filter((r) => r.status === "launched")).toHaveLength(1);
+  expect(readLedgerFile(botPaths(home).ledger).leases["acme/app fn-2"]?.runId).toBe("run-fn-2");
 });
 
 test("freed slot under 10 fills from the firing repo only; cap-full is quiet wait", async () => {

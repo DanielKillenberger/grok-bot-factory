@@ -729,7 +729,7 @@ export async function completeStay(opts: {
       home: opts.home,
       templatePath: opts.templatePath,
       repo: opts.firingRepo,
-      specs: opts.readyInFiringRepo,
+      specs: opts.readyInFiringRepo.filter((spec) => spec.specId !== opts.specId),
       canLaunch: opts.canLaunch,
       post: opts.post,
       createCheck: opts.createCheck,
