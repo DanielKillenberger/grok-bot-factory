@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-28T22:34:28.520177Z",
+  "depends_on": [
+    "fn-4-factory-stay-worker.3"
+  ],
+  "id": "fn-4-factory-stay-worker.4",
+  "priority": null,
+  "spec": "fn-4-factory-stay-worker",
+  "spec_path": ".flow/tasks/fn-4-factory-stay-worker.4.md",
+  "status": "todo",
+  "title": "Judgment, merge, fix, ask, ping",
+  "updated_at": "2026-08-28T22:50:24.643454Z"
+}
