@@ -26,10 +26,10 @@ Use the gate exit code. Preserve stderr.
 | Exit | Meaning | Next |
 |------|---------|------|
 | 0 | quiet | stop. No ping. |
-| 10 | start (`repo sha kind` on stdout) | `bun factory/tick.ts` with that line, instance host CLI, isolated worktree |
+| 10 | start (`repo sha kind` on stdout) | invoke `skills/factory-coordinator/SKILL.md` for that repo. The stdout kind is not the job. Do not run `factory/tick.ts`. |
 | 20 | stuck | `bun factory/notify.ts --from-exit 20 --reason "<stderr>"` |
 
-After a tick, run `bun factory/notify.ts --from-exit <rc> --reason "<stderr>"`. Exit 0 from the tick is quiet (`NO_WORK`). Exit 20 maps to `NEEDS_HUMAN` unless the host verdict is `ASKED` or `DEFERRED_TO_LAND`.
+Exit 0 stays quiet. Exit 20 stays on `factory/notify.ts`. Do not invoke `factory/tick.ts` on start.
 
 Dirty-tree or `BLOCKED` at tick start is `NEEDS_HUMAN`.
 
