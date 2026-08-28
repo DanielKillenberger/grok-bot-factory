@@ -247,6 +247,24 @@ test("builder skill contract", () => {
   expect(/you own the webhook routine/i.test(skill) || /builder owns/i.test(skill)).toBe(true);
 });
 
+const README_EASY_INSTALL_BEATS = [
+  "Orient",
+  "Find repos",
+  "You pick",
+  "Builder/webhook",
+  "Paste two secrets",
+  "Done",
+] as const;
+
+const README_BEAT_ACTION: Record<(typeof README_EASY_INSTALL_BEATS)[number], RegExp> = {
+  Orient: /Confirm you understand/,
+  "Find repos": /bun factory\/discover\.ts/,
+  "You pick": /Wait for an explicit confirmation reply/,
+  "Builder/webhook": /Assign an existing builder/,
+  "Paste two secrets": /Paste `GROK_BOT_WEBHOOK_URL`/,
+  Done: /Stop\. Do not recap/,
+};
+
 test("README contracts", () => {
   const readme = readFileSync(join(ROOT, "README.md"), "utf8");
   const changelog = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
@@ -262,6 +280,55 @@ test("README contracts", () => {
   expect(readme.toLowerCase()).toContain("review pin");
   expect(readme.toLowerCase()).toContain("do not arm");
   expect(/don't arm|does not arm|do not arm/i.test(changelog)).toBe(true);
+
+  const easy = readme.split("## Easy-install")[1]?.split(/^## /m)[0] ?? "";
+  const numbered = [
+    ...easy.matchAll(/^\d+\.\s+\*\*([^*]+)\*\*\s+—\s+(\S.*)$/gm),
+  ];
+  expect(numbered.map((m) => m[1])).toEqual([...README_EASY_INSTALL_BEATS]);
+  for (const m of numbered) {
+    const title = m[1] as (typeof README_EASY_INSTALL_BEATS)[number];
+    const body = m[2] ?? "";
+    const why = body.split(/(?<=\.)\s+/)[0] ?? "";
+    const action = body.slice(why.length).trim();
+    expect(why, `${title} why`).toMatch(/[A-Za-z].{10,}/);
+    expect(action, `${title} action`).toMatch(/[A-Za-z].{10,}/);
+    expect(action, `${title} expected action`).toMatch(README_BEAT_ACTION[title]);
+  }
+  expect(changelog.toLowerCase()).toMatch(/walkthrough|short-beat/);
+  expect(changelog.toLowerCase()).toMatch(/conversation-first/);
+  expect(easy.toLowerCase()).toMatch(/later-proof/);
+  expect(easy.toLowerCase()).toMatch(/after the skill ships/);
+  expect(easy).toMatch(/No-builder/);
+  expect(easy).toMatch(/Existing-builder/);
+  expect(easy.toLowerCase()).toMatch(/create a new builder \+ webhook/);
+  expect(easy.toLowerCase()).toMatch(/live teammates do not count/);
+  expect(easy.toLowerCase()).toMatch(/designated test builder/);
+  expect(easy.toLowerCase()).toMatch(/do not create a third/);
+  expect(easy.toLowerCase()).toMatch(/never the live factory builder/);
+  expect(easy.toLowerCase()).toMatch(/live factory-wake webhook/);
+  expect(easy.toLowerCase()).toMatch(/live secrets/);
+  expect(easy.toLowerCase()).toMatch(/do not arm live factory-wake/);
+  expect(easy.toLowerCase()).toMatch(/no second login/);
+  expect(easy.toLowerCase()).toMatch(/throwaway product repo/);
+  expect(easy.toLowerCase()).toMatch(/second main/);
+  expect(easy.toLowerCase()).toMatch(/shared computer and github/);
+});
+
+test("README Easy-install documents post-tick commit/push; ADVANCED dirty/unpushed is fail", () => {
+  const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+  const easy = readme.split("## Easy-install")[1]?.split(/^## /m)[0] ?? "";
+  expect(easy).toMatch(/After every factory tick/);
+  expect(easy).toMatch(/if the tree moved/);
+  expect(easy).toMatch(/commit \(if needed\) and push to the spec branch/);
+  expect(easy).toMatch(/ADVANCED with a dirty or unpushed tree is a fail, not quiet success/);
+  const done = [
+    ...easy.matchAll(/^\d+\.\s+\*\*([^*]+)\*\*\s+—\s+(\S.*)$/gm),
+  ].find((m) => m[1] === "Done")?.[2] ?? "";
+  expect(done).toMatch(/After every factory tick/);
+  expect(done).toMatch(/commit \(if needed\) and push to the spec branch/);
+  expect(done).toMatch(/ADVANCED with a dirty or unpushed tree is a fail, not quiet success/);
+  expect(done).toMatch(/Stop\. Do not recap/);
 });
 
 test("no live hook or eval in notify", () => {
