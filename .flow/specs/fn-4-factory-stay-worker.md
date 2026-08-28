@@ -16,9 +16,9 @@
 
 > user (turn 1, DISPATCH): "Skip-planning mark set before the push: skip plan and plan-review, go to work-rolling. No skip mark and no tasks: walk all phases (plan, plan-review, work-rolling, make-pr, land). Tasks on disk and no skip mark: work what is there (work-rolling). Native flow-next only has `ready`. There is no native ready-to-work vs ready-to-plan key yet. The skip/plan-offload mark is a factory field until Gordon ships a native one. Do not teach it in easy-install as the product. If Gordon ships native statuses, read his."
 
-> user (turn 1, WORK-ROLLING): "Always invoke /flow-next:work-rolling (not /flow-next:work). Host stays grok. On grok this degrades to wave; take the wave. Do not add a Claude host just to roll. cursor-agent for Sol review is a child of the stay script when a phase needs review, not a new builder-agent turn."
+> user (turn 1, WORK-ROLLING): "Always invoke /flow-next:work-rolling (not /flow-next:work). Host is `cursor-agent` in fast mode (implement default `cursor-grok-4.6-high-fast`). On this host work-rolling degrades to wave; take the wave. Do not add a Claude host just to roll. Do not spawn the grok CLI. cursor-agent for Sol review is a child of the stay script when a phase needs review, not a new builder-agent turn."
 
-> user (turn 1, WORKER): "A Bun TypeScript program, same family as the existing factory program (gate + tick). Three programs, one child: webhook hits gate (start or silent); a new stay script is the loop; it spawns grok with one skill, waits until that process exits, commits, spawns the next. Not a Grok Bot subagent. Not the builder agent in the loop. Hang clock lives in the stay script. Silence past it is NEEDS_HUMAN in this session, not another pickup. No 20-minute poll. Dumb loop, smart skills. grok and Sol steer. NEEDS_WORK means run them again."
+> user (turn 1, WORKER): "A Bun TypeScript program, same family as the existing factory program (gate + tick). Three programs, one child: webhook hits gate (start or silent); a new stay script is the loop; it spawns `cursor-agent` with one skill, waits until that process exits, commits, spawns the next. Not a Grok Bot subagent. Not the builder agent in the loop. Hang clock lives in the stay script. Silence past it is NEEDS_HUMAN in this session, not another pickup. No 20-minute poll. Dumb loop, smart skills. `cursor-agent` and Sol steer. NEEDS_WORK means run them again."
 
 > user (turn 1, OUTCOME MAP): "NEEDS_WORK → same phase again (keep working; do not ask the owner). Phase done → persist, next skill. Merge → exit, quiet. ASKED → stay script exits; that exit is the one builder-agent wake; ask the owner. NEEDS_HUMAN → stay script exits; that exit is the one builder-agent wake; ping the owner. Hang clock → same as NEEDS_HUMAN. Crash → process gone; git has the phase; next pickup/resume continues. No ping. The only builder-agent wake is that stay-script exit. The wrap that waits on the Bun process lives in the shipped webhook path (a worker that holds until the stay script exits). Background Shell will not notify. This is factory, not a builder habit. Other installs must get the NEEDS_HUMAN ping."
 
@@ -29,6 +29,8 @@
 > user (turn 4, Linus): "Resume has to re-derive the next skill from git / flowctl (tasks, PR, review status), not from memory the dead process had. Pickup table is first start. Crash table needs that classify, or a restart guesses."
 
 > user (turn 4, Linus): "Same for the child: grok must exit with a verdict the stay script can parse. Process exits is not a next action. Hang clock number can wait for plan. Not ready until those two are on the map."
+
+> user (turn 5): "btw i've been using cursor-agent seems much faster and efficient than grok build. switch the default to use cursor-agent everywhere as the host cli and use fast mode"
 
 > user (turn 2): "How do we detect non converging work? If impl-review keeps finding issues we need some sort of escalation mechanism"
 
@@ -61,18 +63,18 @@ New spec. Does not rewrite fn-1, fn-2, or fn-3. [user]
 Three programs, one child. [user]
 
 1. **Gate.** Webhook hits gate. Start or silent. Pickup only, once. [user]
-2. **Stay script.** The loop. A Bun TypeScript program, same family as the existing factory program (gate + tick). Spawns grok with one skill, waits until that process exits, persists, spawns the next. Hang clock lives here. [user]
-3. **Child.** grok, one skill per spawn. Skills: plan, plan-review, work-rolling, make-pr, land. Never `/pilot`. [user]
+2. **Stay script.** The loop. A Bun TypeScript program, same family as the existing factory program (gate + tick). Spawns `cursor-agent` with one skill, waits until that process exits, persists, spawns the next. Hang clock lives here. [user]
+3. **Child.** `cursor-agent` in fast mode, one skill per spawn. Implement default: `--model cursor-grok-4.6-high-fast`. Review stays `cursor-agent` with Sol (`gpt-5.6-sol-high`). Skills: plan, plan-review, work-rolling, make-pr, land. Never `/pilot`. [user]
 
 **Wrap.** The shipped webhook path holds until the stay script exits. That exit is the one builder-agent wake. Background Shell will not notify. This is factory, not a builder habit. Other installs must get the NEEDS_HUMAN ping. [user]
 
 The stay script is not a Grok Bot subagent. The builder agent is not in the loop. [user]
 
-`cursor-agent` for Sol review is a child of the stay script when a phase needs review. It is not a new builder-agent turn. [user]
+`cursor-agent` is the host CLI for every skill child, including Sol review. Review is still a stay-script child, not a new builder-agent turn. [user]
 
-Host stays grok. On grok, work-rolling degrades to wave. Take the wave. Do not add a Claude host just to roll. [user]
+Host is `cursor-agent`, fast mode. Implement default `--model cursor-grok-4.6-high-fast`. Review stays Sol (`gpt-5.6-sol-high`) so implement and review stay two families. On this host, work-rolling degrades to wave. Take the wave. Do not add a Claude host just to roll. Do not spawn the grok CLI. [user]
 
-Dumb loop, smart skills. grok and Sol steer. [user]
+Dumb loop, smart skills. `cursor-agent` and Sol steer. [user]
 
 **Resume disk.** git. Persist after every phase: commit and push the spec branch if the tree moved. Crash insurance on the same tree, not a new wake. Crash: process gone, no ping. Next start resumes the next phase from git. [user]
 
@@ -148,7 +150,7 @@ Signals are on disk: tasks, skip mark, plan-review status, open make-pr PR, merg
 
 ### Child verdict
 
-`grok` (and `cursor-agent` when it is the child) must exit with a verdict the stay script can parse. "Process exits" is not a next action. [user]
+`cursor-agent` must exit with a verdict the stay script can parse. "Process exits" is not a next action. [user]
 
 | Child exit | Next action |
 | --- | --- |
@@ -191,7 +193,8 @@ If merge needs the owner's yes, that is ASKED in this session, not a new pickup.
 - Crash does not ping. Next start classifies the next skill from git / flowctl. A restart that guesses the next skill fails this spec. [user]
 - Child exit without a parseable verdict is NEEDS_HUMAN. "Process exits" is not a next action. [user]
 - Factory invoking `/pilot` fails this spec. `/pilot` stays a human `/loop` tool. [user]
-- Adding a Claude host solely so work-rolling can roll fails this spec. Take grok's wave. [user]
+- Adding a Claude host solely so work-rolling can roll fails this spec. Take the wave. [user]
+- Spawning the grok CLI as the skill host fails this spec. Host is `cursor-agent` in fast mode. [user]
 - Sol review as a new builder-agent turn fails this spec. It is a stay-script child. [user]
 - Background Shell as the wait fails this spec. It will not notify. The wrap lives in the shipped webhook path. [user]
 - Second ready spec while one stay is running is out of scope. Single-flight still holds: this spec must not start a second stay. [user]
@@ -210,9 +213,9 @@ If merge needs the owner's yes, that is ASKED in this session, not a new pickup.
 
 - **R4:** Dispatch matches the API Contracts dispatch table. Skip-planning mark set before the push → skip plan and plan-review, go to work-rolling. No skip mark and no tasks → walk all phases. Tasks on disk and no skip mark → work-rolling. Native flow-next only has `ready`. The skip/plan-offload mark is a factory field until native flow-next ships equivalent statuses. Then read native. Do not teach the factory field in easy-install as the product. Errors: skip mark ignored → fail; walking plan when skip mark was set before the push → fail; teaching the factory-only plan key in easy-install as the product → fail this criterion (out of this spec's product surface). [user] [paraphrase]
 
-- **R5:** Always invoke `/flow-next:work-rolling`, never `/flow-next:work`. Host stays grok. On grok this degrades to wave; take the wave. Do not add a Claude host just to roll. `cursor-agent` for Sol review is a child of the stay script when a phase needs review, not a new builder-agent turn. Errors: invoking `/flow-next:work` → fail; adding a Claude host solely to roll → fail; Sol review as a new builder-agent turn → fail. [user]
+- **R5:** Always invoke `/flow-next:work-rolling`, never `/flow-next:work`. Host is `cursor-agent` in fast mode (implement default `cursor-grok-4.6-high-fast`). On this host work-rolling degrades to wave; take the wave. Do not add a Claude host just to roll. Do not spawn the grok CLI. `cursor-agent` for Sol review is a child of the stay script when a phase needs review, not a new builder-agent turn. Errors: invoking `/flow-next:work` → fail; adding a Claude host solely to roll → fail; spawning the grok CLI as host → fail; Sol review as a new builder-agent turn → fail. [user]
 
-- **R6:** The stay script is a Bun TypeScript program in the same family as the existing factory program (gate + tick). Three programs, one child: webhook hits gate (start or silent); the stay script is the loop; it spawns grok with one skill, waits until that process exits, commits, spawns the next. Not a Grok Bot subagent. Not the builder agent in the loop. Hang clock lives in the stay script. Silence past it is NEEDS_HUMAN in this session, not another pickup. No 20-minute poll. Dumb loop, smart skills. grok and Sol steer. NEEDS_WORK means run them again. Errors: builder agent in the loop → fail; Grok Bot subagent as the stay loop → fail; 20-minute poll instead of hang clock → fail; NEEDS_WORK that asks the owner or leaves the phase → fail. [user]
+- **R6:** The stay script is a Bun TypeScript program in the same family as the existing factory program (gate + tick). Three programs, one child: webhook hits gate (start or silent); the stay script is the loop; it spawns `cursor-agent` with one skill, waits until that process exits, commits, spawns the next. Not a Grok Bot subagent. Not the builder agent in the loop. Hang clock lives in the stay script. Silence past it is NEEDS_HUMAN in this session, not another pickup. No 20-minute poll. Dumb loop, smart skills. `cursor-agent` and Sol steer. NEEDS_WORK means run them again. Errors: builder agent in the loop → fail; Grok Bot subagent as the stay loop → fail; 20-minute poll instead of hang clock → fail; NEEDS_WORK that asks the owner or leaves the phase → fail. [user]
 
 - **R7:** The stay script implements the outcome map in API Contracts. Every verdict has the next action listed there. The only builder-agent wake is the stay-script exit (ASKED or NEEDS_HUMAN, including hang clock). The wrap that waits on the Bun process lives in the shipped webhook path (a worker that holds until the stay script exits). Background Shell will not notify. Other installs must get the NEEDS_HUMAN ping. Merge → exit, quiet. Crash → no ping; next pickup/resume continues from git. Errors: a verdict with no next action → fail (spec not ready to build); missing wrap so NEEDS_HUMAN never pings → fail; Background Shell as the wait → fail; builder-agent wake on phase-done, NEEDS_WORK, merge, or crash → fail. [user]
 
@@ -221,6 +224,8 @@ If merge needs the owner's yes, that is ASKED in this session, not a new pickup.
 - **R9:** Advertised pickup is stay-script plus wrap. Same spec updates the easy-install skill and README beat. `tick.ts` is the old one-phase path: delete it or leave it dead and unadvertised. Do not leave both as the advertised start. Do not teach the factory-only plan key in easy-install as the product. Errors: install still advertising gate then `tick.ts` as the start → fail; both stay-script and `tick.ts` advertised as the start → fail. [user]
 
 - **R10:** Resume classifies the next skill from git / flowctl (tasks, skip mark, plan-review status, open make-pr PR, merge / spec status). Not from memory the dead process had. Pickup table is first start. Crash table is restart. The child must exit with a verdict the stay script can parse. Exit without a parseable verdict is NEEDS_HUMAN. "Process exits" is not a next action. Errors: resume that guesses → fail; treating a bare process exit as phase done → fail; continuing after an unparseable exit → fail. [user]
+
+- **R11:** Host CLI is `cursor-agent` everywhere, fast mode. Implement default `--model cursor-grok-4.6-high-fast`. Review stays `cursor-agent --model gpt-5.6-sol-high` as a stay-script child. Do not spawn the grok CLI. Two-family split stays (implement fast grok-via-cursor, review Sol). Errors: grok CLI as host → fail; implement and review the same model → fail; missing fast on the implement child → fail. [user]
 
 ## Boundaries
 <!-- scope: business -->
@@ -266,3 +271,4 @@ Map first. If a verdict has no next action, the spec is not ready to build. Bun 
 | R8 | fn-4.M (TBD - populate via /flow-next:plan) | Three-round NEEDS_WORK cap |
 | R9 | fn-4.M (TBD - populate via /flow-next:plan) | Install advertises stay+wrap, not tick.ts |
 | R10 | fn-4.M (TBD - populate via /flow-next:plan) | Resume classify + parseable child verdict |
+| R11 | fn-4.M (TBD - populate via /flow-next:plan) | cursor-agent host, fast implement, Sol review |
