@@ -37,9 +37,15 @@ Lock restart classification and named-job prompts (R3, R6). The ordered matrix a
 - [ ] Prompts name the matching flow-next skill, use the spec or PR branch, and do not invoke land
 - [ ] `tests/factory/coordinator-classify.test.ts` passes
 ## Done summary
-TBD
+Restart classification keeps the task-1 matrix: after work-rolling, spec-completion-review is next even when a PR is already open. Launch prompts name the matching flow-next skill, stay on the spec or PR branch, and treat later CI or review problems as a fix agent rather than impl-review.
 
+Error cases: R3 skip-completion-review-before-make-pr, R3 standalone impl-review after work-rolling, R6 open-PR-as-mergeable before completion-review, R6 impl-review from missing impl_review_status.
+
+baseline: red (inherited Darwin script -f). Focused verify: bun test tests/factory/coordinator-classify.test.ts — 5 pass.
+
+stage: impl-review - ran (model: gpt-5.6-sol-high) verdict=SHIP
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: a68bff87e672e6bc051303b52ae1973433de406c
+- Tests: bun test tests/factory/coordinator-classify.test.ts
 - PRs:
