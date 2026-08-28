@@ -623,3 +623,127 @@ export async function handleCheckFire(opts: {
 
   return { status: "judge", deleted: false };
 }
+
+export type StayAction = "retry" | "next-job" | "merge" | "fix-agent" | "ask" | "ping" | "hold";
+
+export type NotifyHop = "ASKED" | "NEEDS_HUMAN" | "quiet";
+
+export type JudgeInput = {
+  readable: boolean;
+  stillRunning?: boolean;
+  finishedJob?: NamedJob;
+  nextJob?: NamedJob;
+  prMergeable?: boolean;
+  ciOrReviewNeedsFix?: boolean;
+  ownerAsk?: boolean;
+  stuck?: boolean;
+  retryable?: boolean;
+  rounds?: number;
+  lookCount?: number;
+  wallClockMs?: number;
+};
+
+export type JudgeVerdict = {
+  action: StayAction;
+  notify: NotifyHop;
+  invokeLand: false;
+};
+
+const LEAVES_FLIGHT: ReadonlySet<StayAction> = new Set(["merge", "ask", "ping"]);
+
+export function notifyHopFor(action: StayAction): NotifyHop {
+  if (action === "ask") return "ASKED";
+  if (action === "ping") return "NEEDS_HUMAN";
+  return "quiet";
+}
+
+export function notifyArgvForStay(action: StayAction, reason = ""): string[] | null {
+  const hop = notifyHopFor(action);
+  if (hop === "quiet") return null;
+  return reason ? ["--event", hop, "--reason", reason] : ["--event", hop];
+}
+
+export function judgeStay(input: JudgeInput): JudgeVerdict {
+  const finish = (action: StayAction): JudgeVerdict => ({
+    action,
+    notify: notifyHopFor(action),
+    invokeLand: false,
+  });
+
+  if (input.ownerAsk) return finish("ask");
+  if (input.stuck) return finish("ping");
+  if (input.stillRunning || !input.readable) return finish("hold");
+  if (input.retryable) return finish("retry");
+
+  const afterMakePr = input.finishedJob === "make-pr" || input.nextJob === "watch-or-fix";
+  if (afterMakePr) {
+    if (input.ciOrReviewNeedsFix) return finish("fix-agent");
+    if (input.prMergeable) return finish("merge");
+    return finish("hold");
+  }
+
+  if (input.nextJob && input.nextJob !== "stop" && input.nextJob !== "watch-or-fix") {
+    return finish("next-job");
+  }
+
+  return finish("hold");
+}
+
+export type StayCompletion = {
+  action: StayAction;
+  notify: NotifyHop;
+  invokeLand: false;
+  leaseCleared: boolean;
+  checkDisabled: boolean;
+  filled: PickupResult[];
+  startedOtherRepo: false;
+};
+
+export async function completeStay(opts: {
+  home: string;
+  templatePath: string;
+  firingRepo: string;
+  specId: string;
+  verdict: JudgeVerdict;
+  readyInFiringRepo: ReadySpec[];
+  readyInOtherRepos?: ReadySpec[];
+  canLaunch: boolean;
+  post: (payload: LaunchPayload) => Promise<{ runId: string }>;
+  createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  stopAgent?: (runId: string) => Promise<void>;
+}): Promise<StayCompletion> {
+  void opts.readyInOtherRepos;
+  let leaseCleared = false;
+  let checkDisabled = false;
+  let filled: PickupResult[] = [];
+
+  if (LEAVES_FLIGHT.has(opts.verdict.action)) {
+    const key = leaseKey(opts.firingRepo, opts.specId);
+    const lease = readLedgerFile(botPaths(opts.home).ledger).leases[key];
+    const checkId = leaseCheckId(lease, opts.firingRepo, opts.specId);
+    deleteCheck(opts.home, checkId);
+    await clearLease(opts.home, opts.firingRepo, opts.specId);
+    leaseCleared = true;
+    checkDisabled = readCheckRoutine(opts.home, checkId) === null;
+    filled = await pickupReadySpecs({
+      home: opts.home,
+      templatePath: opts.templatePath,
+      repo: opts.firingRepo,
+      specs: opts.readyInFiringRepo,
+      canLaunch: opts.canLaunch,
+      post: opts.post,
+      createCheck: opts.createCheck,
+      stopAgent: opts.stopAgent,
+    });
+  }
+
+  return {
+    action: opts.verdict.action,
+    notify: opts.verdict.notify,
+    invokeLand: false,
+    leaseCleared,
+    checkDisabled,
+    filled,
+    startedOtherRepo: false,
+  };
+}

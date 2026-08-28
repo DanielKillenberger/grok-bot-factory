@@ -76,3 +76,19 @@ Check-fire order:
 4. agent still running → judge. No look-count auto-ping. Seeing still-running is not itself a ping.
 
 Do not register a Cloud Agent HMAC receiver as the factory-forward webhook. Do not add a factory-wide checker. After merge or escalate, delete leftover checks so they do not consume the per-Bot routine cap. Hiding this Bot does not pause routines.
+
+## Stay loop — after a readable result
+
+Classify and wake already say what happened. After a readable result, choose retry, the next named job, merge, a CI/review fix agent, ask, or ping. Stopping at make-pr or PR-up fails the stay.
+
+Judgment uses the result plus this spec's history. Rounds and look counts are inputs, not caps. Eight rounds can be correct. Three can be enough to ask. A still-running 30-minute look is the same judgment. No round number or look count auto-pings.
+
+After make-pr, watch CI and reviews. Merge when the work is done. Dispatch a fix agent when CI or review needs a fix. You merge. Do not invoke land.
+
+Ask and stuck reuse `factory/notify.ts` and the builder → main → human hop. Coordinator merge is quiet. Do not classify coordinator merge as owner-gated `merge` / `DEFERRED_TO_LAND`.
+
+After escalate (ask or ping), clear the lease and disable the check so a later push is a new pickup.
+
+When a spec leaves flight and the factory is under 10, fill the next slot from the firing repo's remaining ready specs. Do not start another repo on that turn. A full cap is quiet wait, not a ping.
+
+The testable judgment contracts live in `factory/lib/coordinator.ts`.
