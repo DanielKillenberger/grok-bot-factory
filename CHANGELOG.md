@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Advertised factory start is enable the coordinator skill (`skills/factory-coordinator/SKILL.md`), which launches Cursor Cloud Agents. Gate-first stays. The old tick runner stays in the tree unadvertised.
 - `hostProbe` treats an inventory `grok` binary as a loop host even when `grok --help` omits `/loop` and `/goal` (Grok Build slash commands). Other inventory hosts still scan `--help`.
 - `hostRun` invokes basename `grok` via `script -q -e -f -c … <tick-home>/host.typescript` so grok has a PTY, with `--always-approve --no-alt-screen` and one prompt (`/loop 10m <skill>` or `/goal <skill>`). Missing `script(1)` is stuck. Other inventory hosts keep Claude-shaped split argv.
 - `hostRun` ends a grok host on the first `PILOT_VERDICT=` or `LAND_VERDICT=` line in the typescript or script stdout: SIGTERM the script/grok process group, return that line as stdout, exit 0. If grok exits first, return captured typescript/stdout. Timeout still SIGKILL.

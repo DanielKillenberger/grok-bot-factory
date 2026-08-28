@@ -16,7 +16,7 @@ const ALLOWED = new Set([
 ]);
 
 export const ROUTINE_FIRST_ACTION = "bun factory/gate.ts";
-export const ROUTINE_COORDINATOR = "bun factory/tick.ts";
+export const ROUTINE_COORDINATOR = "skills/factory-coordinator/SKILL.md";
 const WORKFLOW_PATH = ".github/workflows/factory-forward.yml";
 const SECRET_URL = "GROK_BOT_WEBHOOK_URL";
 const SECRET_KEY = "GROK_BOT_SENDER_KEY";
