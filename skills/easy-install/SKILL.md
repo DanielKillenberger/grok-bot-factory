@@ -105,6 +105,8 @@ Do not POST GitHub Settings hooks. Do not copy secrets between repos. Partial fa
 
 The fire path exists; ticks are fn-1 now.
 
+After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success.
+
 Stop. Do not recap.
 
 ## Do not
@@ -119,3 +121,4 @@ Stop. Do not recap.
 - Overwrite a product repo’s flow-next:setup pin.
 - Mint a second webhook routine on re-run.
 - Create Settings→Webhooks.
+- Treat ADVANCED with a dirty or unpushed tree as quiet success.

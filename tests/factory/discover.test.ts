@@ -282,3 +282,16 @@ test("discover reuses exported owner/name helper", () => {
   const push = readFileSync(join(ROOT, "factory/lib/github_push.ts"), "utf8");
   expect(push).toMatch(/export function isRepoFullName/);
 });
+
+test("skill documents post-tick commit/push; ADVANCED dirty/unpushed is fail", () => {
+  const skill = readFileSync(SKILL_EASY_INSTALL, "utf8");
+  const done = beatBody(skill, 6, "Done");
+  expect(done).toMatch(/After every factory tick/);
+  expect(done).toMatch(/if the tree moved/);
+  expect(done).toMatch(/commit \(if needed\) and push to the spec branch/);
+  expect(done).toMatch(/ADVANCED with a dirty or unpushed tree is a fail, not quiet success/);
+  expect(done).toMatch(/Stop\. Do not recap/);
+  expect(skill).toMatch(
+    /Do not[\s\S]*ADVANCED with a dirty or unpushed tree as quiet success/,
+  );
+});

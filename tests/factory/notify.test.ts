@@ -315,6 +315,22 @@ test("README contracts", () => {
   expect(easy.toLowerCase()).toMatch(/shared computer and github/);
 });
 
+test("README Easy-install documents post-tick commit/push; ADVANCED dirty/unpushed is fail", () => {
+  const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+  const easy = readme.split("## Easy-install")[1]?.split(/^## /m)[0] ?? "";
+  expect(easy).toMatch(/After every factory tick/);
+  expect(easy).toMatch(/if the tree moved/);
+  expect(easy).toMatch(/commit \(if needed\) and push to the spec branch/);
+  expect(easy).toMatch(/ADVANCED with a dirty or unpushed tree is a fail, not quiet success/);
+  const done = [
+    ...easy.matchAll(/^\d+\.\s+\*\*([^*]+)\*\*\s+—\s+(\S.*)$/gm),
+  ].find((m) => m[1] === "Done")?.[2] ?? "";
+  expect(done).toMatch(/After every factory tick/);
+  expect(done).toMatch(/commit \(if needed\) and push to the spec branch/);
+  expect(done).toMatch(/ADVANCED with a dirty or unpushed tree is a fail, not quiet success/);
+  expect(done).toMatch(/Stop\. Do not recap/);
+});
+
 test("no live hook or eval in notify", () => {
   const notify = readFileSync(join(ROOT, "factory/notify.ts"), "utf8");
   const skillDir = readFileSync(SKILL, "utf8");

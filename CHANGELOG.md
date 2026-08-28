@@ -5,7 +5,7 @@
 ### Added
 
 - Factory runtime: deterministic GitHub-push wake gate, isolated tick runner, and stuck/owner-gated notify (builder → main → human). The builder owns the webhook routine and execs the gate before any model. Implementing this does not arm a production wake.
-- Easy-install: short-beat walkthrough (orient → find repos → you pick → builder/webhook → paste two secrets → done). Conversation-first; fire path unchanged (confirm set, one builder webhook, factory-forward Action + two secrets, not Settings hooks).
+- Easy-install: short-beat walkthrough (orient → find repos → you pick → builder/webhook → paste two secrets → done). Conversation-first; fire path unchanged (confirm set, one builder webhook, factory-forward Action + two secrets, not Settings hooks). After every factory tick, if the tree moved, commit (if needed) and push to the spec branch; ADVANCED with a dirty or unpushed tree is a fail, not quiet success.
 
 ### Changed
 

@@ -51,7 +51,7 @@ Send this repo to your **main** Grok Bot agent. Easy-install is optional and not
 3. **You pick** — You choose the set. Named repo without `.flow/`: ask intent and whether `/flow-next:setup`; never auto-init, never silent skip. Wait for an explicit confirmation reply naming the set.
 4. **Builder/webhook** — One builder, one webhook for all Actions. Assign an existing builder; create one only if none exists. Do not mint a second routine.
 5. **Paste two secrets** — GitHub never shows secret values. Paste `GROK_BOT_WEBHOOK_URL` and `GROK_BOT_SENDER_KEY` from the routine panel, then install the factory-forward Action on the confirmed set. Not Settings hooks.
-6. **Done** — The fire path exists; ticks are the factory program above. Stop. Do not recap.
+6. **Done** — The fire path exists; ticks are the factory program above. After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. Stop. Do not recap.
 
 Main supervises setup only. The routine’s first action is still `bun factory/gate.ts` (no model), then `factory/tick.ts` with the instance host CLI. Do not overwrite a product repo’s flow-next:setup review pin.
 
