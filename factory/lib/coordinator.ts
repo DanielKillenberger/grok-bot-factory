@@ -70,6 +70,7 @@ export type BotPaths = {
   memoryHowToRun: string;
   ledger: string;
   lock: string;
+  routines: string;
 };
 
 function reviewDone(status: string | null): boolean {
@@ -85,6 +86,7 @@ export function botPaths(home: string): BotPaths {
     memoryHowToRun: join(home, "memory", "how-to-run.md"),
     ledger: join(home, "ledger", "leases.json"),
     lock: join(home, "ledger", "lock"),
+    routines: join(home, "routines"),
   };
 }
 
@@ -98,6 +100,31 @@ export function clientAgentIdFor(key: string): string {
 
 export function checkRoutineIdFor(key: string): string {
   return `factory-check:${key}`;
+}
+
+export type CheckRoutine = {
+  id: string;
+  repo: string;
+  specId: string;
+  intervalMinutes: 30;
+};
+
+export function checkRoutinePath(home: string, checkRoutineId: string): string {
+  return join(botPaths(home).routines, `${checkRoutineId.replace(/[/\\]/g, "_")}.json`);
+}
+
+export function createNamedCheck(home: string, lease: Lease): { checkRoutineId: string } {
+  const checkRoutineId = checkRoutineIdFor(lease.key);
+  const path = checkRoutinePath(home, checkRoutineId);
+  mkdirSync(dirname(path), { recursive: true });
+  const routine: CheckRoutine = {
+    id: checkRoutineId,
+    repo: lease.repo,
+    specId: lease.specId,
+    intervalMinutes: 30,
+  };
+  writeFileSync(path, `${JSON.stringify(routine, null, 2)}\n`);
+  return { checkRoutineId };
 }
 
 export function classifyNextJob(fields: ClassifyFields): NamedJob {
@@ -303,7 +330,7 @@ export async function pickupAndLaunch(opts: {
   await recordRunId(opts.home, opts.repo, opts.specId, runId);
   const createCheck =
     opts.createCheck ??
-    (async (lease: Lease) => ({ checkRoutineId: checkRoutineIdFor(lease.key) }));
+    (async (lease: Lease) => createNamedCheck(opts.home, lease));
   const check = await createCheck({ ...reserved.lease, runId });
   if ("error" in check) {
     if (opts.stopAgent) await opts.stopAgent(runId);

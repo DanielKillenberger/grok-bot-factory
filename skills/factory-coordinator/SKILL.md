@@ -35,7 +35,7 @@ Use this matrix before the first launch. Start every ready spec in the firing re
 
 ## Lease and cap
 
-In flight means a live Cloud Agent run for that spec, a live per-spec check, or this coordinator turn. Lease key is repo `full_name` plus spec id. Persist the lease and a deterministic client agent id on this Bot computer before the launch POST. Then POST, write run id, create the check, write check-routine id. On crash, reconcile from the lease. Do not launch a second agent for the same key.
+In flight means a live Cloud Agent run for that spec, a live per-spec check, or this coordinator turn. Lease key is repo `full_name` plus spec id. Persist the lease and a deterministic client agent id on this Bot computer before the launch POST. Then POST, write run id, create that spec's named 30-minute check routine on this Bot computer, write check-routine id. On crash, reconcile from the lease. Do not launch a second agent for the same key.
 
 Reserve a factory slot under one atomic file lock on this Bot computer (same `wx` lock shape as `factory/lib/lock.ts`). Cap is 10. An 11th in-flight spec never starts. Extra ready specs wait. No ping for a full cap. The per-Bot routine cap of 50 remains a backstop ping if a check cannot be added.
 

@@ -11,6 +11,7 @@ import {
   leaseKey,
   loadLiveHowToRun,
   checkRoutineIdFor,
+  checkRoutinePath,
   pickupAndLaunch,
   pickupReadySpecs,
   readLedgerFile,
@@ -186,6 +187,12 @@ test("lease key is repo plus spec id; lease and client agent id are written befo
   const stored = readLedgerFile(botPaths(home).ledger).leases[key];
   expect(stored?.runId).toBe("run-1");
   expect(stored?.checkRoutineId).toBe(checkRoutineIdFor(key));
+  expect(JSON.parse(readFileSync(checkRoutinePath(home, checkRoutineIdFor(key)), "utf8"))).toMatchObject({
+    id: checkRoutineIdFor(key),
+    repo: "acme/app",
+    specId: "fn-1",
+    intervalMinutes: 30,
+  });
 });
 
 test("launch creates and persists the named per-spec 30-minute check; create fail stops the agent and pings", async () => {
