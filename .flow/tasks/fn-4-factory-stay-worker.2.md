@@ -42,9 +42,13 @@ Teach the coordinator skill the hang backstop and the Cloud-done continue path (
 - [ ] The PR-watch routine self-destructs on merge or cleared lease
 - [ ] `tests/factory/coordinator-wake.test.ts` passes
 ## Done summary
-TBD
+Done-wake and the 30-minute check cancel the hang detector only for the matching run id, treat a FINISHED run with no artifact as unknown, retarget the same routine as a PR watch after make-pr, and follow merged/cleared → PR-watch → orphan-delete → still-running-judge. Stale wakes and post-GET replacement runs do not cancel the live check.
 
+baseline: red (inherited Darwin script -f). Focused verify: bun test tests/factory/coordinator-wake.test.ts — 8 pass.
+
+stage: impl-review - ran (model: gpt-5.6-sol-high) verdict=SHIP
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 67882d87e1b75d12e4099f4e31ecb4dd3abb0f08, 2ea2a207e49e28d3cbccd4c461cce547cdc0877c, e2967a12d9810f93dd7d04ea598712dfda290b2c, 830ad0e032609a2a4e3d976b340833f12be0ff13, 9a9e553177c6e3c618fe810d89bb92af7917cf29
+- Tests: bun test tests/factory/coordinator-wake.test.ts
 - PRs:

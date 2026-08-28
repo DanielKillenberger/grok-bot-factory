@@ -14,7 +14,7 @@
   "id": "fn-4-factory-stay-worker",
   "impl_review_rounds": {
     "fn-4-factory-stay-worker.1": 0,
-    "fn-4-factory-stay-worker.2": 4,
+    "fn-4-factory-stay-worker.2": 0,
     "fn-4-factory-stay-worker.5": 0
   },
   "next_task": null,
@@ -897,10 +897,37 @@
       "task": "fn-4-factory-stay-worker.2",
       "timestamp": "2026-08-28T23:43:53.206153Z",
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "e511195c9e2aea18c33280bf6bc2c6d2e32ed1e5697b8f9100c2b7c2b7952b50",
+      "backend": "host",
+      "counter_kind": "impl",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "9a9e553177c6e3c618fe810d89bb92af7917cf29",
+      "head_sha_observed": false,
+      "kind": "impl",
+      "outcome": "verdict",
+      "output_bytes": 111,
+      "output_sha256": "1a058d59b590b99b45ce32f3ef32857ca9c346d2742ec0482f8c9d759a252338",
+      "reservation_id": "863efcbdc36b4bb99cea132c7b45b1b4",
+      "round_consumed": true,
+      "scope": "impl:fn-4-factory-stay-worker.2",
+      "superseded_by": null,
+      "task": "fn-4-factory-stay-worker.2",
+      "timestamp": "2026-08-28T23:44:48.983542Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:fn-4-factory-stay-worker.1": 1,
+    "impl:fn-4-factory-stay-worker.2": 1,
     "impl:fn-4-factory-stay-worker.5": 1,
     "plan": 1,
     "plan#completion": 0
@@ -927,5 +954,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-28T23:43:53.464887Z"
+  "updated_at": "2026-08-28T23:44:49.246451Z"
 }
