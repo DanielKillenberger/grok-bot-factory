@@ -129,7 +129,11 @@ Every verdict has a next action. A verdict with no next action means this spec i
 
 | Verdict | Next action | Persist | Builder-agent wake | Owner |
 | --- | --- | --- | --- | --- |
-| NEEDS_WORK | Same phase again. Keep working. | per phase | no | do not ask |
+| NEEDS_WORK (round < 3) | Same phase again. Keep working. | per phase | no | do not ask |
+| NEEDS_WORK (3rd round, no SHIP) | Escalate. Same as NEEDS_HUMAN. | per phase | yes | ping |
+| Same majors after a fix | One NEEDS_WORK round. Not a fresh problem. | - | no | do not ask |
+| Commit that does not answer the last review | Does not reset the round count. | - | no | do not ask |
+| Commit that answers the last review | Progress. Round count resets. | per phase | no | none |
 | Phase done | Next skill. | commit and push spec branch if the tree moved | no | none |
 | Merge | Stay script exits. | - | no | quiet |
 | ASKED | Stay script exits. That exit is the one builder-agent wake. | - | yes | ask |
@@ -173,7 +177,11 @@ If merge needs the owner's yes, that is ASKED in this session, not a new pickup.
 
 - **R6:** The stay script is a Bun TypeScript program in the same family as the existing factory program (gate + tick). Three programs, one child: webhook hits gate (start or silent); the stay script is the loop; it spawns grok with one skill, waits until that process exits, commits, spawns the next. Not a Grok Bot subagent. Not the builder agent in the loop. Hang clock lives in the stay script. Silence past it is NEEDS_HUMAN in this session, not another pickup. No 20-minute poll. Dumb loop, smart skills. grok and Sol steer. NEEDS_WORK means run them again. Errors: builder agent in the loop → fail; Grok Bot subagent as the stay loop → fail; 20-minute poll instead of hang clock → fail; NEEDS_WORK that asks the owner or leaves the phase → fail. [user]
 
-- **R7: The stay script implements the outcome map in API Contracts. Every verdict has the next action listed there. The only builder-agent wake is the stay-script exit (ASKED or NEEDS_HUMAN, including hang clock). The wrap that waits on the Bun process lives in the shipped webhook path (a worker that holds until the stay script exits). Background Shell will not notify. Other installs must get the NEEDS_HUMAN ping. Merge → exit, quiet. Crash → no ping; next pickup/resume continues from git. Errors: a verdict with no next action → fail (spec not ready to build); missing wrap so NEEDS_HUMAN never pings → fail; Background Shell as the wait → fail; builder-agent wake on phase-done, NEEDS_WORK, merge, or crash → fail. [user]
+- **R7:** The stay script implements the outcome map in API Contracts. Every verdict has the next action listed there. The only builder-agent wake is the stay-script exit (ASKED or NEEDS_HUMAN, including hang clock). The wrap that waits on the Bun process lives in the shipped webhook path (a worker that holds until the stay script exits). Background Shell will not notify. Other installs must get the NEEDS_HUMAN ping. Merge → exit, quiet. Crash → no ping; next pickup/resume continues from git. Errors: a verdict with no next action → fail (spec not ready to build); missing wrap so NEEDS_HUMAN never pings → fail; Background Shell as the wait → fail; builder-agent wake on phase-done, NEEDS_WORK, merge, or crash → fail. [user]
+
+- **R8:** Non-converging work. NEEDS_WORK is not forever. Same phase, three rounds without SHIP → NEEDS_HUMAN. Same majors after a fix are one round. A commit that does not answer the last review does not reset the count. Only a commit that answers the last review is progress. Hang clock is time; this cap is not-converging. Errors: unbounded NEEDS_WORK loop → fail; counting a non-answering commit as progress / reset → fail; treating repeated same majors as a fresh problem that resets the cap → fail. [user]
+
+- **R9:** Advertised pickup is stay-script plus wrap. Same spec updates the easy-install skill and README beat. `tick.ts` is the old one-phase path: delete it or leave it dead and unadvertised. Do not leave both as the advertised start. Do not teach the factory-only plan key in easy-install as the product. Errors: install still advertising gate then `tick.ts` as the start → fail; both stay-script and `tick.ts` advertised as the start → fail. [user]
 
 ## Boundaries
 <!-- scope: business -->
