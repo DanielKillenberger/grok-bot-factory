@@ -46,9 +46,15 @@ Retarget advertised start and the install/test strings that still lock the old t
 - [ ] Factory tests that locked the old start are retargeted and `bun test tests/factory/` passes
 - [ ] CHANGELOG Unreleased records the start change
 ## Done summary
-TBD
+README, easy-install, and the install report now advertise start as enable the coordinator skill, which launches Cursor Cloud Agents. Factory tests that locked `factory/tick.ts` or `instance host cli` as that start are retargeted.
 
+baseline: red (inherited Darwin `/usr/bin/script: illegal option -- f` in hostRun/tick). Focused verify: bun test tests/factory/install.test.ts tests/factory/notify.test.ts — 45 pass.
+
+Error cases: R9 advertising factory/tick.ts as the start.
+
+stage: impl-review - ran (model: gpt-5.6-sol-high) verdict=SHIP
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 1987c44a33bfc8c8012815ef5bf16016cb248448
+- Tests: bun test tests/factory/install.test.ts tests/factory/notify.test.ts
 - PRs:

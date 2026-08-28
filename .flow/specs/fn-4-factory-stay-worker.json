@@ -13,7 +13,8 @@
   ],
   "id": "fn-4-factory-stay-worker",
   "impl_review_rounds": {
-    "fn-4-factory-stay-worker.1": 0
+    "fn-4-factory-stay-worker.1": 0,
+    "fn-4-factory-stay-worker.5": 0
   },
   "next_task": null,
   "plan_review_rounds": 0,
@@ -765,10 +766,37 @@
       "task": "fn-4-factory-stay-worker.1",
       "timestamp": "2026-08-28T23:29:16.625772Z",
       "verdict": "SHIP"
+    },
+    {
+      "artifact_sha256": "cf6fe53290ad0f5b47270ad7db35b551c625a0e8b427e3c60336859cb2af1077",
+      "backend": "host",
+      "counter_kind": "impl",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "not_applicable"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "1987c44a33bfc8c8012815ef5bf16016cb248448",
+      "head_sha_observed": false,
+      "kind": "impl",
+      "outcome": "verdict",
+      "output_bytes": 58,
+      "output_sha256": "585b83f98f0299f54054b10a32e8b69738b2a56cc7ed50e38bfb6c5db09e823c",
+      "reservation_id": "d8dd95ce89eb4f5f9a55b4513fb52145",
+      "round_consumed": true,
+      "scope": "impl:fn-4-factory-stay-worker.5",
+      "superseded_by": null,
+      "task": "fn-4-factory-stay-worker.5",
+      "timestamp": "2026-08-28T23:35:13.658598Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
     "impl:fn-4-factory-stay-worker.1": 1,
+    "impl:fn-4-factory-stay-worker.5": 1,
     "plan": 1,
     "plan#completion": 0
   },
@@ -776,6 +804,7 @@
   "review_reservations": {},
   "review_transport_failures": {
     "impl:fn-4-factory-stay-worker.1": 0,
+    "impl:fn-4-factory-stay-worker.5": 0,
     "plan": 0
   },
   "spec_path": ".flow/specs/fn-4-factory-stay-worker.md",
@@ -792,5 +821,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-28T23:29:16.902948Z"
+  "updated_at": "2026-08-28T23:35:13.919824Z"
 }
