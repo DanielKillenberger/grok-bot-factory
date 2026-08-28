@@ -168,6 +168,25 @@ test("done-wake does not cancel a replacement run's check created during GET", a
   });
   expect(result).toEqual({ status: "stale", cancelled: false });
   expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
+
+  const checkHome = home;
+  const again = await seedBuildRun("run-c", "fn-check-rollover");
+  const fired = await handleCheckFire({
+    home: checkHome,
+    repo: again.repo,
+    specId: again.specId,
+    specStatus: "open",
+    hasOpenUnmergedPr: false,
+    getRun: async () => {
+      await recordRunId(checkHome, again.repo, again.specId, "run-d");
+      const lease = readLedgerFile(botPaths(checkHome).ledger).leases[`${again.repo} ${again.specId}`]!;
+      createNamedCheck(checkHome, { ...lease, runId: "run-d" });
+      return { status: "FINISHED" };
+    },
+    readArtifact: async () => ({ kind: "git", summary: "old-check" }),
+  });
+  expect(fired).toEqual({ status: "stale", cancelled: false });
+  expect(readCheckRoutine(checkHome, again.checkRoutineId)).not.toBeNull();
 });
 
 test("after make-pr, cancel then retarget the same per-spec routine as a PR watch", async () => {

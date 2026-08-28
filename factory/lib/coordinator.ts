@@ -527,7 +527,8 @@ export async function handleCheckFire(opts: {
     return { status: "stop", deleted: true, reason: "orphan" };
   }
 
-  const run = lease.runId ? await opts.getRun(lease.runId) : { status: "GONE" as const };
+  const observedRunId = lease.runId;
+  const run = observedRunId ? await opts.getRun(observedRunId) : { status: "GONE" as const };
   if (run.status === "FINISHED" || run.status === "ERROR") {
     return afterCancelledBuildRun({
       home: opts.home,
@@ -536,6 +537,7 @@ export async function handleCheckFire(opts: {
       hint: {},
       runStatus: run.status,
       readArtifact: opts.readArtifact ?? (async () => null),
+      expectedRunId: observedRunId,
     });
   }
 
