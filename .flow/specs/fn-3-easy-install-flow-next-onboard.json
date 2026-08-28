@@ -149,7 +149,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/fn-3-easy-install-flow-next-onboard.md",
-  "status": "open",
+  "status": "done",
   "title": "Easy-install flow-next onboard",
   "tracker": {
     "baseHashFlow": null,
@@ -162,5 +162,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-27T19:49:35.467248Z"
+  "updated_at": "2026-08-28T10:47:49.373299Z"
 }
