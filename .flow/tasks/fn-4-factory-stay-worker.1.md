@@ -54,9 +54,15 @@ Ship the coordinator skill and how-to-run template, retarget the builder start p
 - [ ] Cap slots are reserved under one atomic lock; an 11th in-flight spec never starts
 - [ ] `tests/factory/coordinator-pickup.test.ts` covers cross-repo keys and concurrent reserve
 ## Done summary
-TBD
+Coordinator skill and how-to-run template now exist, builder exit 10 invokes that skill instead of factory/tick.ts, and pickup contracts lock the classify matrix, live-file-first, owner-only lessons, pre-POST lease, cross-repo keys, work-on-current-branch / PR-head launch, the atomic 10-spec cap, named 30-minute check create, and multi-spec pickup to cap.
 
+Error cases: R1 11th in-flight spec, R7 launch-before-live-read, untrusted lesson writes, check-create fail stops the agent and pings.
+
+baseline: red (bun test tests/factory/ failed pre-edit — inherited Darwin `/usr/bin/script: illegal option -- f` in hostRun/tick). Focused verify: bun test tests/factory/coordinator-pickup.test.ts — 11 pass.
+
+stage: impl-review - ran (model: gpt-5.6-sol-high) verdict=SHIP
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: a4d41b34a3b8f03dc85490af9797e3579b27f944, 9617b34c031446c16aa7f7226917b126412a41bc, 508e7e97dbd8fd244fab5371e487881b1fd48c41
+- Tests: baseline: red (bun test tests/factory/ failed pre-edit), bun test tests/factory/coordinator-pickup.test.ts
 - PRs:
