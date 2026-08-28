@@ -456,10 +456,14 @@ async function afterCancelledBuildRun(opts: {
   hint: WakeHint;
   runStatus: RunStatus;
   readArtifact: ArtifactReader;
+  expectedRunId?: string;
 }): Promise<DoneWakeResult> {
   const paths = botPaths(opts.home);
   const key = leaseKey(opts.repo, opts.specId);
   const lease = readLedgerFile(paths.ledger).leases[key];
+  if (opts.expectedRunId && lease?.runId !== opts.expectedRunId) {
+    return { status: "stale", cancelled: false };
+  }
   cancelBuildRunCheck(opts.home, leaseCheckId(lease, opts.repo, opts.specId));
   if (opts.runStatus === "RUNNING") return { status: "judge", cancelled: true };
   const artifact = await opts.readArtifact({ hint: opts.hint, runStatus: opts.runStatus });
@@ -492,6 +496,7 @@ export async function handleDoneWake(opts: {
     hint: opts.hint,
     runStatus: run.status,
     readArtifact: opts.readArtifact,
+    expectedRunId: opts.runId,
   });
 }
 

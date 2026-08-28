@@ -3,13 +3,16 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
   SHIPPED_HOW_TO_RUN_TEMPLATE,
+  botPaths,
   cancelBuildRunCheck,
   checkRoutinePath,
+  createNamedCheck,
   deleteCheck,
   handleCheckFire,
   handleDoneWake,
   pickupAndLaunch,
   readCheckRoutine,
+  readLedgerFile,
   recordRunId,
   retargetAsPrWatch,
   type ClassifyFields,
@@ -145,6 +148,26 @@ test("stale done-wake for a prior run does not cancel the current run's check", 
     readArtifact: async () => ({ kind: "git", summary: "ghost" }),
   });
   expect(missing).toEqual({ status: "stale", cancelled: false });
+});
+
+test("done-wake does not cancel a replacement run's check created during GET", async () => {
+  const seeded = await seedBuildRun("run-a");
+  const result = await handleDoneWake({
+    home,
+    repo: seeded.repo,
+    specId: seeded.specId,
+    runId: "run-a",
+    hint: { finished: true },
+    getRun: async () => {
+      await recordRunId(home, seeded.repo, seeded.specId, "run-b");
+      const lease = readLedgerFile(botPaths(home).ledger).leases[`${seeded.repo} ${seeded.specId}`]!;
+      createNamedCheck(home, { ...lease, runId: "run-b" });
+      return { status: "FINISHED" };
+    },
+    readArtifact: async () => ({ kind: "git", summary: "old" }),
+  });
+  expect(result).toEqual({ status: "stale", cancelled: false });
+  expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
 });
 
 test("after make-pr, cancel then retarget the same per-spec routine as a PR watch", async () => {
