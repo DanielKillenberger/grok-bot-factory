@@ -184,6 +184,76 @@ export function classifyNextJob(fields: ClassifyFields): NamedJob {
   return "make-pr";
 }
 
+export type GitSidecarSpec = {
+  status: string;
+  plan_review_status?: string | null;
+  completion_review_status?: string | null;
+  impl_review_status?: string | null;
+};
+
+export type GitSidecarTask = {
+  status: string;
+};
+
+export function fieldsFromGit(input: {
+  spec: GitSidecarSpec;
+  tasks: GitSidecarTask[];
+  hasOpenUnmergedPr: boolean;
+  hasPlan: boolean;
+}): ClassifyFields {
+  void input.spec.impl_review_status;
+  const specStatus =
+    input.spec.status === "merged" || input.spec.status === "closed"
+      ? input.spec.status
+      : "open";
+  const taskStatuses = input.tasks.map((t) => t.status);
+  const allDone = taskStatuses.length > 0 && taskStatuses.every((s) => s === "done");
+  return {
+    specStatus,
+    hasPlan: input.hasPlan,
+    planReviewStatus: input.spec.plan_review_status ?? null,
+    workRemaining: !allDone,
+    workRollingFinished: allDone,
+    completionReviewStatus: input.spec.completion_review_status ?? null,
+    hasOpenUnmergedPr: input.hasOpenUnmergedPr,
+  };
+}
+
+export const JOB_SKILL: Record<Exclude<NamedJob, "stop" | "watch-or-fix">, string> = {
+  plan: "/flow-next:plan",
+  "plan-review": "/flow-next:plan-review",
+  "work-rolling": "/flow-next:work-rolling",
+  "spec-completion-review": "/flow-next:spec-completion-review",
+  "make-pr": "/flow-next:make-pr",
+};
+
+export function promptForJob(job: NamedJob, specId: string): string {
+  if (job === "stop") return "";
+  if (job === "watch-or-fix") {
+    return `CI/review fix for ${specId}. Stay on the spec branch or pull-request head.`;
+  }
+  if (job === "work-rolling") {
+    return `${JOB_SKILL[job]} ${specId}. One agent. Review each finished task as it goes. Stay on the spec branch or pull-request head.`;
+  }
+  return `${JOB_SKILL[job]} ${specId}. Stay on the spec branch or pull-request head.`;
+}
+
+export function isGeneratedCursorBranch(branch: string): boolean {
+  return branch === "cursor" || branch.startsWith("cursor/");
+}
+
+export function launchRefForPhase(input: {
+  specBranch: string;
+  prHead?: string | null;
+  appearedBranch?: string | null;
+}): LaunchRef {
+  void input.appearedBranch;
+  if (input.prHead && !isGeneratedCursorBranch(input.prHead)) {
+    return { kind: "pr", head: input.prHead };
+  }
+  return { kind: "spec-branch", branch: input.specBranch };
+}
+
 export function isBuildLaunchJob(job: NamedJob): boolean {
   return (
     job === "plan" ||
@@ -371,7 +441,7 @@ export async function pickupAndLaunch(opts: {
     repo: opts.repo,
     ref: opts.ref,
     clientAgentId: reserved.lease.clientAgentId,
-    prompt: job,
+    prompt: promptForJob(job, opts.specId),
   });
   const { runId } = await opts.post(payload);
   await recordRunId(opts.home, opts.repo, opts.specId, runId);

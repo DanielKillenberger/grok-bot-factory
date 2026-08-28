@@ -31,7 +31,20 @@ Ordered matrix, first match:
 6. open unmerged PR → watch or CI/review fix
 7. no PR → make-pr
 
-Use this matrix before the first launch. Start every ready spec in the firing repo that is not already in flight, until 10 specs are in flight factory-wide. Extra ready specs wait. Do not start another repo's specs on this fire.
+Use this matrix before the first launch and on every restart. After work-rolling finishes, next is spec-completion-review if that status is not done, even if a PR is already open. A later review or CI problem is a CI/review fix agent, not impl-review. Start every ready spec in the firing repo that is not already in flight, until 10 specs are in flight factory-wide. Extra ready specs wait. Do not start another repo's specs on this fire.
+
+## Named-job prompts
+
+Each Cloud Agent launch prompt names the matching flow-next skill:
+
+- plan → `/flow-next:plan`
+- plan-review → `/flow-next:plan-review`
+- work-rolling → `/flow-next:work-rolling` (one agent; it reviews each finished task as it goes; a failed per-task review retries or asks inside that job)
+- spec-completion-review → `/flow-next:spec-completion-review`
+- make-pr → `/flow-next:make-pr`
+- later CI or review problem → a CI/review fix agent
+
+Do not invoke land. Do not invent `/pilot`. Do not launch `/flow-next:impl-review`. Later phases stay on the spec branch or that spec's open PR head. Do not follow a generated cursor branch if one appeared.
 
 ## Lease and cap
 
