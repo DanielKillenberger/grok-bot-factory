@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { isRepoFullName } from "./github_push.ts";
 import { withFileLock } from "./lock.ts";
@@ -102,11 +102,14 @@ export function checkRoutineIdFor(key: string): string {
   return `factory-check:${key}`;
 }
 
+export type CheckPurpose = "build-run" | "pr-watch";
+
 export type CheckRoutine = {
   id: string;
   repo: string;
   specId: string;
   intervalMinutes: 30;
+  purpose: CheckPurpose;
 };
 
 export function checkRoutinePath(home: string, checkRoutineId: string): string {
@@ -122,6 +125,50 @@ export function createNamedCheck(home: string, lease: Lease): { checkRoutineId: 
     repo: lease.repo,
     specId: lease.specId,
     intervalMinutes: 30,
+    purpose: "build-run",
+  };
+  writeFileSync(path, `${JSON.stringify(routine, null, 2)}\n`);
+  return { checkRoutineId };
+}
+
+export function readCheckRoutine(home: string, checkRoutineId: string): CheckRoutine | null {
+  const path = checkRoutinePath(home, checkRoutineId);
+  if (!existsSync(path)) return null;
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<CheckRoutine>;
+  const purpose: CheckPurpose = parsed.purpose === "pr-watch" ? "pr-watch" : "build-run";
+  return {
+    id: parsed.id ?? checkRoutineId,
+    repo: parsed.repo ?? "",
+    specId: parsed.specId ?? "",
+    intervalMinutes: 30,
+    purpose,
+  };
+}
+
+export function deleteCheck(home: string, checkRoutineId: string): { deleted: boolean } {
+  const path = checkRoutinePath(home, checkRoutineId);
+  if (!existsSync(path)) return { deleted: false };
+  unlinkSync(path);
+  return { deleted: true };
+}
+
+export function cancelBuildRunCheck(home: string, checkRoutineId: string): { cancelled: boolean } {
+  const routine = readCheckRoutine(home, checkRoutineId);
+  if (!routine) return { cancelled: false };
+  if (routine.purpose === "pr-watch") return { cancelled: false };
+  return { cancelled: deleteCheck(home, checkRoutineId).deleted };
+}
+
+export function retargetAsPrWatch(home: string, lease: Lease): { checkRoutineId: string } {
+  const checkRoutineId = lease.checkRoutineId ?? checkRoutineIdFor(lease.key);
+  const path = checkRoutinePath(home, checkRoutineId);
+  mkdirSync(dirname(path), { recursive: true });
+  const routine: CheckRoutine = {
+    id: checkRoutineId,
+    repo: lease.repo,
+    specId: lease.specId,
+    intervalMinutes: 30,
+    purpose: "pr-watch",
   };
   writeFileSync(path, `${JSON.stringify(routine, null, 2)}\n`);
   return { checkRoutineId };
@@ -368,4 +415,129 @@ export async function pickupReadySpecs(opts: {
     if (result.status === "wait") break;
   }
   return results;
+}
+
+export type RunStatus = "FINISHED" | "ERROR" | "RUNNING" | "GONE";
+
+export type WakeHint = {
+  finished?: boolean;
+  transcriptPath?: string;
+};
+
+export type WakeArtifact =
+  | { kind: "transcript"; path: string }
+  | { kind: "git"; summary: string };
+
+export type ArtifactReader = (input: {
+  hint: WakeHint;
+  runStatus: RunStatus;
+}) => Promise<WakeArtifact | null>;
+
+export type DoneWakeResult =
+  | { status: "unknown"; cancelled: true; runStatus: RunStatus }
+  | { status: "continue"; cancelled: true; runStatus: RunStatus; artifact: WakeArtifact }
+  | { status: "judge"; cancelled: true };
+
+export type CheckFireResult =
+  | { status: "stop"; deleted: true; reason: "merged_or_cleared" | "orphan" }
+  | { status: "pr-watch-or-fix"; deleted: false }
+  | { status: "judge"; deleted: false }
+  | DoneWakeResult;
+
+function leaseCheckId(lease: Lease | undefined, repo: string, specId: string): string {
+  return lease?.checkRoutineId ?? checkRoutineIdFor(leaseKey(repo, specId));
+}
+
+async function afterCancelledBuildRun(opts: {
+  home: string;
+  repo: string;
+  specId: string;
+  hint: WakeHint;
+  runStatus: RunStatus;
+  readArtifact: ArtifactReader;
+}): Promise<DoneWakeResult> {
+  const paths = botPaths(opts.home);
+  const key = leaseKey(opts.repo, opts.specId);
+  const lease = readLedgerFile(paths.ledger).leases[key];
+  cancelBuildRunCheck(opts.home, leaseCheckId(lease, opts.repo, opts.specId));
+  if (opts.runStatus === "RUNNING") return { status: "judge", cancelled: true };
+  const artifact = await opts.readArtifact({ hint: opts.hint, runStatus: opts.runStatus });
+  if (!artifact) return { status: "unknown", cancelled: true, runStatus: opts.runStatus };
+  return { status: "continue", cancelled: true, runStatus: opts.runStatus, artifact };
+}
+
+export async function handleDoneWake(opts: {
+  home: string;
+  repo: string;
+  specId: string;
+  hint: WakeHint;
+  getRun: (runId: string) => Promise<{ status: RunStatus }>;
+  readArtifact: ArtifactReader;
+}): Promise<DoneWakeResult> {
+  const paths = botPaths(opts.home);
+  const key = leaseKey(opts.repo, opts.specId);
+  const lease = readLedgerFile(paths.ledger).leases[key];
+  const checkRoutineId = leaseCheckId(lease, opts.repo, opts.specId);
+  cancelBuildRunCheck(opts.home, checkRoutineId);
+  const run = lease?.runId ? await opts.getRun(lease.runId) : { status: "GONE" as const };
+  return afterCancelledBuildRun({
+    home: opts.home,
+    repo: opts.repo,
+    specId: opts.specId,
+    hint: opts.hint,
+    runStatus: run.status,
+    readArtifact: opts.readArtifact,
+  });
+}
+
+export async function handleCheckFire(opts: {
+  home: string;
+  repo: string;
+  specId: string;
+  specStatus: "open" | "merged" | "closed";
+  leaseCleared?: boolean;
+  hasOpenUnmergedPr: boolean;
+  getRun: (runId: string) => Promise<{ status: RunStatus }>;
+  readArtifact?: ArtifactReader;
+}): Promise<CheckFireResult> {
+  const paths = botPaths(opts.home);
+  const key = leaseKey(opts.repo, opts.specId);
+  const lease = opts.leaseCleared ? undefined : readLedgerFile(paths.ledger).leases[key];
+  const checkRoutineId = leaseCheckId(lease, opts.repo, opts.specId);
+  const purpose = readCheckRoutine(opts.home, checkRoutineId)?.purpose;
+
+  if (opts.specStatus !== "open" || opts.leaseCleared || !lease) {
+    deleteCheck(opts.home, checkRoutineId);
+    return { status: "stop", deleted: true, reason: "merged_or_cleared" };
+  }
+
+  if (purpose === "pr-watch") {
+    if (opts.hasOpenUnmergedPr) return { status: "pr-watch-or-fix", deleted: false };
+    deleteCheck(opts.home, checkRoutineId);
+    return { status: "stop", deleted: true, reason: "orphan" };
+  }
+
+  const run = lease.runId ? await opts.getRun(lease.runId) : { status: "GONE" as const };
+  if (run.status === "FINISHED" || run.status === "ERROR") {
+    return afterCancelledBuildRun({
+      home: opts.home,
+      repo: opts.repo,
+      specId: opts.specId,
+      hint: {},
+      runStatus: run.status,
+      readArtifact: opts.readArtifact ?? (async () => null),
+    });
+  }
+
+  if (opts.hasOpenUnmergedPr && run.status !== "RUNNING") {
+    retargetAsPrWatch(opts.home, lease);
+    return { status: "pr-watch-or-fix", deleted: false };
+  }
+
+  if (run.status !== "RUNNING") {
+    deleteCheck(opts.home, checkRoutineId);
+    return { status: "stop", deleted: true, reason: "orphan" };
+  }
+
+  return { status: "judge", deleted: false };
 }
