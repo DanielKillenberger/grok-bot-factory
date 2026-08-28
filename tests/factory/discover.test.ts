@@ -295,3 +295,26 @@ test("skill documents post-tick commit/push; ADVANCED dirty/unpushed is fail", (
     /Do not[\s\S]*ADVANCED with a dirty or unpushed tree as quiet success/,
   );
 });
+
+test("skill You pick probes a named repo absent from non-empty fleet candidates", () => {
+  const skill = readFileSync(SKILL_EASY_INSTALL, "utf8");
+  const youPick = beatBody(skill, 3, "You pick");
+  expect(youPick).toMatch(/fleet/);
+  expect(youPick).toMatch(/non-empty `candidates`/);
+  expect(youPick).toMatch(/not in `candidates`|absent from `candidates`/);
+  expect(youPick).toMatch(
+    /bun factory\/discover\.ts --named owner\/name --whitelist owner\/name/,
+  );
+
+  const cmdIdx = youPick.search(
+    /bun factory\/discover\.ts --named owner\/name --whitelist owner\/name/,
+  );
+  expect(cmdIdx).toBeGreaterThan(-1);
+  const afterProbe = youPick.slice(cmdIdx);
+  expect(afterProbe).toMatch(/named_without_flow/);
+  expect(afterProbe).toMatch(/whether they intended that repo/);
+  expect(afterProbe).toMatch(/\/flow-next:setup/);
+  expect(afterProbe).toMatch(/Do not auto-init/);
+  expect(afterProbe).toMatch(/Do not silently skip/);
+  expect(afterProbe).toMatch(/Do not install/);
+});

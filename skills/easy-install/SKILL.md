@@ -63,6 +63,17 @@ Present the candidate `owner/name` list. Wait for an explicit confirmation reply
 
 A confirm card may appear; conversation-only still works. Unconfirmed candidates never reach Action install or routine create.
 
+After fleet discover (including a non-empty `candidates` list), if they name a repo that is not in `candidates`, do not skip it silently. Probe only that name with the same targeted discover as no-confirm / empty-list:
+
+```bash
+bun factory/discover.ts --named owner/name --whitelist owner/name
+```
+
+Then:
+- Name in `candidates`: treat as a one-name set at You pick. Wait for an explicit confirmation reply. Install only names in this `candidates` list.
+- Name in `named_without_flow`: ask whether they intended that repo and whether to init flow-next (`/flow-next:setup`). Do not auto-init. Do not silently skip. Do not install. After they finish setup, re-run the same targeted discover until the name is in `candidates`.
+- Exit 20: show stderr and stop.
+
 ## 4. Builder/webhook
 
 One builder and one webhook routine wake every confirmed Action.
