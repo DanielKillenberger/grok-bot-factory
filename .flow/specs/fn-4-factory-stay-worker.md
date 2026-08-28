@@ -26,6 +26,12 @@
 
 > user (turn 1, STYLE): "Spec is the map. Concrete. Terse. Acceptance criteria from these locks only. ready=false. Draft."
 
+> user (turn 2): "How do we detect non converging work? If impl-review keeps finding issues we need some sort of escalation mechanism"
+
+> user (turn 2, locked): "NEEDS_WORK is not forever. Same phase, three rounds without SHIP → NEEDS_HUMAN. Same majors after a fix are one round. A commit that does not answer the last review does not reset the count. Only a commit that answers the last review is progress. Hang clock is time. This cap is not-converging."
+
+> user (turn 3): "Yes on install, if pickup changes. fn-3 still says gate then tick.ts. If the wrap + stay script is the new first action, this spec should update that README/skill beat. Not a second spec. Leave tick.ts as the old one-phase path or delete it. Do not leave both as the advertised start."
+
 ## Goal & Context
 <!-- scope: business -->
 
@@ -75,7 +81,8 @@ stateDiagram-v2
   Pickup --> Stay: gate start (once)
   Stay --> Skill: spawn grok (one skill)
   Skill --> Stay: process exits
-  Stay --> Skill: NEEDS_WORK (same phase)
+  Stay --> Skill: NEEDS_WORK (same phase, round < 3)
+  Stay --> WakePing: NEEDS_WORK 3rd round no SHIP
   Stay --> Skill: phase done (persist, next skill)
   Stay --> Quiet: merge (exit, no ping)
   Stay --> WakeAsk: ASKED (stay exits)
@@ -148,6 +155,8 @@ If merge needs the owner's yes, that is ASKED in this session, not a new pickup.
 - Background Shell as the wait fails this spec. It will not notify. The wrap lives in the shipped webhook path. [user]
 - Second ready spec while one stay is running is out of scope. Single-flight still holds: this spec must not start a second stay. [user]
 - Grok Bot platform wake-miss (ACK 200, no turn) is not this program. [user]
+- Unbounded NEEDS_WORK. Three rounds, no SHIP, then NEEDS_HUMAN. A commit that ignores the last review does not reset the count. [user]
+- Install advertising `tick.ts` as the start after this ships. Stay-script plus wrap is the advertised start. [user]
 
 ## Acceptance Criteria
 <!-- scope: both -->
@@ -164,6 +173,10 @@ If merge needs the owner's yes, that is ASKED in this session, not a new pickup.
 
 - **R6:** The stay script is a Bun TypeScript program in the same family as the existing factory program (gate + tick). Three programs, one child: webhook hits gate (start or silent); the stay script is the loop; it spawns grok with one skill, waits until that process exits, commits, spawns the next. Not a Grok Bot subagent. Not the builder agent in the loop. Hang clock lives in the stay script. Silence past it is NEEDS_HUMAN in this session, not another pickup. No 20-minute poll. Dumb loop, smart skills. grok and Sol steer. NEEDS_WORK means run them again. Errors: builder agent in the loop → fail; Grok Bot subagent as the stay loop → fail; 20-minute poll instead of hang clock → fail; NEEDS_WORK that asks the owner or leaves the phase → fail. [user]
 
+- **R8:** Non-converging work. NEEDS_WORK is not forever. Same phase, three rounds without SHIP → NEEDS_HUMAN. Same majors after a fix are one round. A commit that does not answer the last review does not reset the count. Only a commit that answers the last review is progress. Hang clock is time; this cap is not-converging. Errors: unbounded NEEDS_WORK loop → fail; counting a non-answering commit as progress / reset → fail; treating repeated same majors as a fresh problem that resets the cap → fail. [user]
+
+- **R9:** Advertised pickup is stay-script plus wrap. Same spec updates the easy-install skill and README beat. `tick.ts` is the old one-phase path: delete it or leave it dead and unadvertised. Do not leave both as the advertised start. Do not teach the factory-only plan key in easy-install as the product. Errors: install still advertising gate then `tick.ts` as the start → fail; both stay-script and `tick.ts` advertised as the start → fail. [user]
+
 - **R7:** The stay script implements the outcome map in API Contracts. Every verdict has the next action listed there. The only builder-agent wake is the stay-script exit (ASKED or NEEDS_HUMAN, including hang clock). The wrap that waits on the Bun process lives in the shipped webhook path (a worker that holds until the stay script exits). Background Shell will not notify. Other installs must get the NEEDS_HUMAN ping. Merge → exit, quiet. Crash → no ping; next pickup/resume continues from git. Errors: a verdict with no next action → fail (spec not ready to build); missing wrap so NEEDS_HUMAN never pings → fail; Background Shell as the wait → fail; builder-agent wake on phase-done, NEEDS_WORK, merge, or crash → fail. [user]
 
 ## Boundaries
@@ -173,7 +186,7 @@ If merge needs the owner's yes, that is ASKED in this session, not a new pickup.
 - Second ready spec while one stay is running (queue/switch). Later. Single-flight in R1 still holds. [user]
 - Same-account easy-install e2e. Later. [user]
 - Grok Bot platform wake-miss (ACK 200, no turn). Not this program. [user]
-- Teaching the factory-only plan key in easy-install as the product. [user]
+- Teaching the factory-only plan key in easy-install as the product (the skip mark). Updating the advertised pickup to stay-script plus wrap is this spec (R9). [user]
 - Implementing the Bun stay program in this spec. Map first, Bun later. This spec does not write the program. [user]
 - Rewrite of fn-1, fn-2, or fn-3. [user]
 - Personal names. Secrets. [user]
