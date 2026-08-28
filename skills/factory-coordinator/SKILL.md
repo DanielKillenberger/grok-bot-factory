@@ -31,7 +31,7 @@ Ordered matrix, first match:
 6. open unmerged PR → watch or CI/review fix
 7. no PR → make-pr
 
-Use this matrix before the first launch. Only start ready specs in the firing repo that are not already in flight.
+Use this matrix before the first launch. Start every ready spec in the firing repo that is not already in flight, until 10 specs are in flight factory-wide. Extra ready specs wait. Do not start another repo's specs on this fire.
 
 ## Lease and cap
 

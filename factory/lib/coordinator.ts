@@ -96,6 +96,10 @@ export function clientAgentIdFor(key: string): string {
   return createHash("sha256").update(`factory-client:${key}`).digest("hex");
 }
 
+export function checkRoutineIdFor(key: string): string {
+  return `factory-check:${key}`;
+}
+
 export function classifyNextJob(fields: ClassifyFields): NamedJob {
   if (fields.specStatus === "merged" || fields.specStatus === "closed") return "stop";
   if (!fields.hasPlan) return "plan";
@@ -211,6 +215,23 @@ export async function recordRunId(
   });
 }
 
+export async function recordCheckRoutineId(
+  home: string,
+  repo: string,
+  specId: string,
+  checkRoutineId: string,
+): Promise<void> {
+  const paths = botPaths(home);
+  const key = leaseKey(repo, specId);
+  await withFileLock(paths.lock, async () => {
+    const ledger = readLedgerFile(paths.ledger);
+    const lease = ledger.leases[key];
+    if (!lease) throw new Error("lease missing");
+    lease.checkRoutineId = checkRoutineId;
+    writeLedgerFile(paths.ledger, ledger);
+  });
+}
+
 export function buildLaunchPayload(opts: {
   repo: string;
   ref: LaunchRef;
@@ -239,7 +260,13 @@ export type PickupResult =
   | { status: "wait" }
   | { status: "stop" }
   | { status: "watch-or-fix" }
-  | { status: "ping"; reason: "cannot_launch" };
+  | { status: "ping"; reason: "cannot_launch" | "check_create_failed" };
+
+export type ReadySpec = {
+  specId: string;
+  fields: ClassifyFields;
+  ref: LaunchRef;
+};
 
 export async function pickupAndLaunch(opts: {
   home: string;
@@ -250,6 +277,8 @@ export async function pickupAndLaunch(opts: {
   ref: LaunchRef;
   canLaunch: boolean;
   post: (payload: LaunchPayload) => Promise<{ runId: string }>;
+  createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  stopAgent?: (runId: string) => Promise<void>;
 }): Promise<PickupResult> {
   loadLiveHowToRun(opts.home, opts.templatePath);
   const job = classifyNextJob(opts.fields);
@@ -272,5 +301,44 @@ export async function pickupAndLaunch(opts: {
   });
   const { runId } = await opts.post(payload);
   await recordRunId(opts.home, opts.repo, opts.specId, runId);
-  return { status: "launched", payload, lease: { ...reserved.lease, runId } };
+  const createCheck =
+    opts.createCheck ??
+    (async (lease: Lease) => ({ checkRoutineId: checkRoutineIdFor(lease.key) }));
+  const check = await createCheck({ ...reserved.lease, runId });
+  if ("error" in check) {
+    if (opts.stopAgent) await opts.stopAgent(runId);
+    await clearLease(opts.home, opts.repo, opts.specId);
+    return { status: "ping", reason: "check_create_failed" };
+  }
+  await recordCheckRoutineId(opts.home, opts.repo, opts.specId, check.checkRoutineId);
+  return {
+    status: "launched",
+    payload,
+    lease: { ...reserved.lease, runId, checkRoutineId: check.checkRoutineId },
+  };
+}
+
+export async function pickupReadySpecs(opts: {
+  home: string;
+  templatePath: string;
+  repo: string;
+  specs: ReadySpec[];
+  canLaunch: boolean;
+  post: (payload: LaunchPayload) => Promise<{ runId: string }>;
+  createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  stopAgent?: (runId: string) => Promise<void>;
+}): Promise<PickupResult[]> {
+  loadLiveHowToRun(opts.home, opts.templatePath);
+  const results: PickupResult[] = [];
+  for (const spec of opts.specs) {
+    const result = await pickupAndLaunch({
+      ...opts,
+      specId: spec.specId,
+      fields: spec.fields,
+      ref: spec.ref,
+    });
+    results.push(result);
+    if (result.status === "wait") break;
+  }
+  return results;
 }

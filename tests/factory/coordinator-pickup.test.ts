@@ -10,7 +10,9 @@ import {
   clientAgentIdFor,
   leaseKey,
   loadLiveHowToRun,
+  checkRoutineIdFor,
   pickupAndLaunch,
+  pickupReadySpecs,
   readLedgerFile,
   requireLiveHowToRun,
   reserveSlot,
@@ -180,7 +182,74 @@ test("lease key is repo plus spec id; lease and client agent id are written befo
     clientAgentId: wantId,
   });
   expect(leaseAtPost?.runId).toBeUndefined();
-  expect(readLedgerFile(botPaths(home).ledger).leases[key]?.runId).toBe("run-1");
+  expect(leaseAtPost?.checkRoutineId).toBeUndefined();
+  const stored = readLedgerFile(botPaths(home).ledger).leases[key];
+  expect(stored?.runId).toBe("run-1");
+  expect(stored?.checkRoutineId).toBe(checkRoutineIdFor(key));
+});
+
+test("launch creates and persists the named per-spec 30-minute check; create fail stops the agent and pings", async () => {
+  const key = leaseKey("acme/app", "fn-1");
+  const ok = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-1" }),
+    createCheck: async () => ({ checkRoutineId: "routine-fn-1" }),
+  });
+  expect(ok.status).toBe("launched");
+  if (ok.status !== "launched") return;
+  expect(ok.lease.checkRoutineId).toBe("routine-fn-1");
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]?.checkRoutineId).toBe("routine-fn-1");
+
+  const failHome = tempDir();
+  const stopped: string[] = [];
+  const failed = await pickupAndLaunch({
+    home: failHome,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-fail" }),
+    createCheck: async () => ({ error: "cannot_create" }),
+    stopAgent: async (runId) => {
+      stopped.push(runId);
+    },
+  });
+  expect(failed).toEqual({ status: "ping", reason: "check_create_failed" });
+  expect(stopped).toEqual(["run-fail"]);
+  expect(readLedgerFile(botPaths(failHome).ledger).leases[key]).toBeUndefined();
+  rmSync(failHome, { recursive: true, force: true });
+});
+
+test("pickup starts every ready spec in the firing repo until the 10-spec cap", async () => {
+  const posted: string[] = [];
+  const results = await pickupReadySpecs({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    canLaunch: true,
+    specs: Array.from({ length: FACTORY_CAP + 2 }, (_, i) => ({
+      specId: `fn-${i}`,
+      fields: firstLaunch,
+      ref: { kind: "spec-branch" as const, branch: `fn-${i}` },
+    })),
+    post: async (payload) => {
+      posted.push(payload.source.ref);
+      return { runId: `run-${payload.source.ref}` };
+    },
+  });
+  expect(results.filter((r) => r.status === "launched")).toHaveLength(FACTORY_CAP);
+  expect(results.filter((r) => r.status === "wait")).toHaveLength(1);
+  expect(posted).toHaveLength(FACTORY_CAP);
+  expect(Object.keys(readLedgerFile(botPaths(home).ledger).leases)).toHaveLength(FACTORY_CAP);
+  expect(results.at(-1)?.status).toBe("wait");
 });
 
 test("cross-repo lease keys do not collide", async () => {
