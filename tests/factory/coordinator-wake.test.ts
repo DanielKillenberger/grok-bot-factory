@@ -10,6 +10,7 @@ import {
   handleDoneWake,
   pickupAndLaunch,
   readCheckRoutine,
+  recordRunId,
   retargetAsPrWatch,
   type ClassifyFields,
   type RunStatus,
@@ -64,6 +65,7 @@ test("done-wake and a finished-check cancel the build-run check before the next 
     home,
     repo: seeded.repo,
     specId: seeded.specId,
+    runId: seeded.lease.runId!,
     hint: { finished: true, transcriptPath: "/tmp/transcript.json" },
     getRun: async () => {
       checkAtGet = readCheckRoutine(home, seeded.checkRoutineId);
@@ -104,12 +106,34 @@ test("FINISHED with no readable artifact is unknown, not phase done", async () =
     home,
     repo: seeded.repo,
     specId: seeded.specId,
+    runId: seeded.lease.runId!,
     hint: { finished: true },
     getRun: async () => ({ status: "FINISHED" }),
     readArtifact: async () => null,
   });
   expect(result).toEqual({ status: "unknown", cancelled: true, runStatus: "FINISHED" });
   expect(result.status).not.toBe("continue");
+});
+
+test("stale done-wake for a prior run does not cancel the current run's check", async () => {
+  const seeded = await seedBuildRun("run-a");
+  await recordRunId(home, seeded.repo, seeded.specId, "run-b");
+  let gotRun: string | undefined;
+  const stale = await handleDoneWake({
+    home,
+    repo: seeded.repo,
+    specId: seeded.specId,
+    runId: "run-a",
+    hint: { finished: true },
+    getRun: async (runId) => {
+      gotRun = runId;
+      return { status: "FINISHED" };
+    },
+    readArtifact: async () => ({ kind: "git", summary: "stale" }),
+  });
+  expect(stale).toEqual({ status: "stale", cancelled: false });
+  expect(gotRun).toBeUndefined();
+  expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
 });
 
 test("after make-pr, cancel then retarget the same per-spec routine as a PR watch", async () => {

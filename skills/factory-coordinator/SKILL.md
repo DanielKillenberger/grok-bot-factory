@@ -49,7 +49,7 @@ The testable pickup and wake contracts live in `factory/lib/coordinator.ts`.
 
 ## Done-wake and the 30-minute check
 
-When a Cloud Agent finishes or errors, that wakes this coordinator. The revival payload is finished plus a transcript dump, not a verdict. Cancel the 30-minute check that was watching that run first. Then GET the run — run status (`FINISHED` / `ERROR`) is truth, not the done-wake hint. Read the result from the agent or from git using the persisted ids. A FINISHED run with no readable artifact is unknown. Do not treat it as phase done.
+When a Cloud Agent finishes or errors, that wakes this coordinator. The revival payload is finished plus a transcript dump, not a verdict. The wake names the run that finished. If that run id is not the current lease run, ignore it and do not cancel the live check. Cancel the 30-minute check that was watching that run first. Then GET the run — run status (`FINISHED` / `ERROR`) is truth, not the done-wake hint. Read the result from the agent or from git using the persisted ids. A FINISHED run with no readable artifact is unknown. Do not treat it as phase done.
 
 The 30-minute check is the guaranteed detector if the done-wake never fires. A check fire that finds a finished or errored run is the same as a done-wake: cancel that build-run check, then act.
 
