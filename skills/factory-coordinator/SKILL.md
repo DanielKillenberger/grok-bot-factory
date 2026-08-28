@@ -87,7 +87,7 @@ After make-pr, watch CI and reviews. Merge when the work is done. Dispatch a fix
 
 Ask and stuck reuse `factory/notify.ts` and the builder → main → human hop. Coordinator merge is quiet. Do not classify coordinator merge as owner-gated `merge` / `DEFERRED_TO_LAND`.
 
-After escalate (ask or ping), clear the lease and disable the check so a later push is a new pickup.
+After escalate (ask or ping), clear the lease and disable the check so a later push is a new pickup. Do not immediately restart that same spec from the ready list on this turn.
 
 When a spec leaves flight and the factory is under 10, fill the next slot from the firing repo's remaining ready specs. Do not start another repo on that turn. A full cap is quiet wait, not a ping.
 

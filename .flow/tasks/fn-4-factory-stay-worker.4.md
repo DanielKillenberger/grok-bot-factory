@@ -49,9 +49,15 @@ Add the stay loop after a readable result exists (R2, R5). Classify and wake alr
 - [ ] A freed slot under 10 starts the next ready spec in the firing repo only
 - [ ] `tests/factory/coordinator-judge.test.ts` passes
 ## Done summary
-TBD
+After a readable result the coordinator stay loop chooses retry, next job, merge, fix-agent, ask, or ping. Rounds and look counts do not auto-ping; ask and stuck reuse the notify hop; coordinator merge is quiet; escalate clears the lease and check and does not immediately relaunch that same spec; a freed slot under 10 fills from the firing repo only.
 
+Error cases: R2 stopping-at-make-pr-or-PR-up, R5 fixed-round-or-look-count auto-ping.
+
+baseline: red (bun test tests/factory/ failed pre-edit — inherited Darwin script -f). Focused verify: bun test tests/factory/coordinator-judge.test.ts — 6 pass.
+
+stage: impl-review - ran (model: gpt-5.6-sol-high) verdict=SHIP
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 632c167c5a06263a18d73f77441b2c4bd478b211, 52e5261f026a63f6e8991cf4c6d9a64fbefe5b58
+- Tests: bun test tests/factory/coordinator-judge.test.ts, bun test tests/factory/, baseline: red (bun test tests/factory/ failed pre-edit — inherited Darwin script -f)
 - PRs:
