@@ -134,6 +134,17 @@ test("stale done-wake for a prior run does not cancel the current run's check", 
   expect(stale).toEqual({ status: "stale", cancelled: false });
   expect(gotRun).toBeUndefined();
   expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
+
+  const missing = await handleDoneWake({
+    home,
+    repo: "acme/app",
+    specId: "fn-missing",
+    runId: "run-ghost",
+    hint: { finished: true },
+    getRun: async () => ({ status: "FINISHED" }),
+    readArtifact: async () => ({ kind: "git", summary: "ghost" }),
+  });
+  expect(missing).toEqual({ status: "stale", cancelled: false });
 });
 
 test("after make-pr, cancel then retarget the same per-spec routine as a PR watch", async () => {

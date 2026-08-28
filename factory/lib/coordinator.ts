@@ -479,7 +479,7 @@ export async function handleDoneWake(opts: {
   const paths = botPaths(opts.home);
   const key = leaseKey(opts.repo, opts.specId);
   const lease = readLedgerFile(paths.ledger).leases[key];
-  if (lease?.runId && lease.runId !== opts.runId) {
+  if (!lease?.runId || lease.runId !== opts.runId) {
     return { status: "stale", cancelled: false };
   }
   const checkRoutineId = leaseCheckId(lease, opts.repo, opts.specId);
