@@ -103,6 +103,23 @@ test("done-wake and a finished-check cancel the build-run check before the next 
   expect(fired).toMatchObject({ status: "continue", cancelled: true, runStatus: "FINISHED" });
 });
 
+test("GET failure after cancel recreates the check so the hang detector stays", async () => {
+  const seeded = await seedBuildRun("run-get-fail");
+  const result = await handleDoneWake({
+    home,
+    repo: seeded.repo,
+    specId: seeded.specId,
+    runId: seeded.lease.runId!,
+    hint: { finished: true },
+    getRun: async () => {
+      throw new Error("getRun failed");
+    },
+    readArtifact: async () => ({ kind: "git", summary: "unused" }),
+  });
+  expect(result).toEqual({ status: "judge", cancelled: false });
+  expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
+});
+
 test("FINISHED with no readable artifact is unknown, not phase done", async () => {
   const seeded = await seedBuildRun();
   const result = await handleDoneWake({
@@ -309,6 +326,12 @@ test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, the
       expect(readCheckRoutine(caseHome, launched.lease.checkRoutineId!), c.name).toBeNull();
     } else {
       expect(readCheckRoutine(caseHome, launched.lease.checkRoutineId!), c.name).not.toBeNull();
+    }
+    if (c.name === "orphan" || c.name === "merged") {
+      expect(
+        readLedgerFile(botPaths(caseHome).ledger).leases["acme/app fn-1"],
+        c.name,
+      ).toBeUndefined();
     }
     rmSync(caseHome, { recursive: true, force: true });
   }

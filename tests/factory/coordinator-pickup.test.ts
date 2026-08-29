@@ -273,7 +273,17 @@ test("cross-repo lease keys do not collide", async () => {
 
 test("in-flight later push is ignore even when launch is currently impossible", async () => {
   const key = leaseKey("acme/app", "fn-1");
-  expect((await reserveSlot(home, "acme/app", "fn-1")).status).toBe("reserved");
+  const launched = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-live" }),
+  });
+  expect(launched.status).toBe("launched");
   let posted = false;
   const again = await pickupAndLaunch({
     home,
@@ -290,7 +300,41 @@ test("in-flight later push is ignore even when launch is currently impossible", 
   });
   expect(again.status).toBe("already");
   expect(posted).toBe(false);
-  expect(readLedgerFile(botPaths(home).ledger).leases[key]).toBeDefined();
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]?.runId).toBe("run-live");
+});
+
+test("a crash lease without a run id is reconciled instead of ignored as in-flight", async () => {
+  const key = leaseKey("acme/app", "fn-1");
+  expect((await reserveSlot(home, "acme/app", "fn-1")).status).toBe("reserved");
+  const recovered = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-reconcile" }),
+  });
+  expect(recovered.status).toBe("launched");
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]?.runId).toBe("run-reconcile");
+});
+
+test("check-create failure without stopAgent keeps the lease so the run stays tracked", async () => {
+  const key = leaseKey("acme/app", "fn-1");
+  const failed = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-unstopped" }),
+    createCheck: async () => ({ error: "cannot_create" }),
+  });
+  expect(failed).toEqual({ status: "ping", reason: "check_create_failed" });
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]?.runId).toBe("run-unstopped");
 });
 
 test("new pickup that cannot launch pings and does not leave a reserved slot", async () => {

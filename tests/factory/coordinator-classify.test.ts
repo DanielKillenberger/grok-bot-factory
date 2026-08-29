@@ -60,6 +60,16 @@ test("after work-rolling, restart classifies spec-completion-review from the tas
   expect(classifyNextJob(sidecarFields({}))).toBe("spec-completion-review");
 });
 
+test("completion-review not_required is done and does not relaunch completion-review", () => {
+  expect(classifyNextJob({ ...afterWorkRolling, completionReviewStatus: "not_required" })).toBe(
+    "make-pr",
+  );
+  expect(classifyNextJob(sidecarFields({ completion: "not_required" }))).toBe("make-pr");
+  expect(classifyNextJob(sidecarFields({ completion: "not_required", hasOpenUnmergedPr: true }))).toBe(
+    "watch-or-fix",
+  );
+});
+
 test("open PR before completion-review is done classifies as spec-completion-review, not merge", () => {
   const fields = sidecarFields({ hasOpenUnmergedPr: true, completion: "unknown" });
   expect(classifyNextJob(fields)).toBe("spec-completion-review");

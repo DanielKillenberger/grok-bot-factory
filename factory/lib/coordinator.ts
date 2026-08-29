@@ -76,7 +76,7 @@ export type BotPaths = {
 function reviewDone(status: string | null): boolean {
   if (!status) return false;
   const s = status.toLowerCase();
-  return s === "done" || s === "ship";
+  return s === "done" || s === "ship" || s === "not_required";
 }
 
 export function botPaths(home: string): BotPaths {
@@ -418,38 +418,61 @@ export type ReadySpec = {
   ref: LaunchRef;
 };
 
-export async function pickupAndLaunch(opts: {
+async function recordClientAgentId(
+  home: string,
+  repo: string,
+  specId: string,
+  clientAgentId: string,
+): Promise<void> {
+  const paths = botPaths(home);
+  const key = leaseKey(repo, specId);
+  await withFileLock(paths.lock, async () => {
+    const ledger = readLedgerFile(paths.ledger);
+    const lease = ledger.leases[key];
+    if (!lease) throw new Error("lease missing");
+    lease.clientAgentId = clientAgentId;
+    writeLedgerFile(paths.ledger, ledger);
+  });
+}
+
+async function stopThenMaybeClear(opts: {
   home: string;
-  templatePath: string;
   repo: string;
   specId: string;
-  fields: ClassifyFields;
-  ref: LaunchRef;
-  canLaunch: boolean;
-  post: (payload: LaunchPayload) => Promise<{ runId: string }>;
-  createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  runId: string;
   stopAgent?: (runId: string) => Promise<void>;
-}): Promise<PickupResult> {
-  loadLiveHowToRun(opts.home, opts.templatePath);
-  const job = classifyNextJob(opts.fields);
-  if (job === "stop") {
-    await clearLease(opts.home, opts.repo, opts.specId);
-    return { status: "stop" };
+}): Promise<boolean> {
+  if (!opts.stopAgent) return false;
+  try {
+    await opts.stopAgent(opts.runId);
+  } catch {
+    return false;
   }
-  if (job === "watch-or-fix") return { status: "watch-or-fix" };
+  await clearLease(opts.home, opts.repo, opts.specId);
+  return true;
+}
 
-  const reserved = await reserveSlot(opts.home, opts.repo, opts.specId);
-  if (reserved.status === "cap_full") return { status: "wait" };
-  if (reserved.status === "already") return { status: "already", lease: reserved.lease };
-  if (!opts.canLaunch) {
-    await clearLease(opts.home, opts.repo, opts.specId);
-    return { status: "ping", reason: "cannot_launch" };
+async function postAndPersist(
+  opts: {
+    home: string;
+    repo: string;
+    specId: string;
+    ref: LaunchRef;
+    post: (payload: LaunchPayload) => Promise<{ runId: string }>;
+    createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+    stopAgent?: (runId: string) => Promise<void>;
+  },
+  lease: Lease,
+  job: NamedJob,
+  clientAgentId: string,
+): Promise<PickupResult> {
+  if (clientAgentId !== lease.clientAgentId) {
+    await recordClientAgentId(opts.home, opts.repo, opts.specId, clientAgentId);
   }
-
   const payload = buildLaunchPayload({
     repo: opts.repo,
     ref: opts.ref,
-    clientAgentId: reserved.lease.clientAgentId,
+    clientAgentId,
     prompt: promptForJob(job, opts.specId),
   });
   let runId: string | undefined;
@@ -467,29 +490,92 @@ export async function pickupAndLaunch(opts: {
     await clearLease(opts.home, opts.repo, opts.specId);
     return { status: "ping", reason: "cannot_launch" };
   }
+  return persistRunAndCheck(opts, { ...lease, clientAgentId }, payload, runId);
+}
 
+async function persistRunAndCheck(
+  opts: {
+    home: string;
+    repo: string;
+    specId: string;
+    createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+    stopAgent?: (runId: string) => Promise<void>;
+  },
+  lease: Lease,
+  payload: LaunchPayload,
+  runId: string,
+): Promise<PickupResult> {
   try {
     await recordRunId(opts.home, opts.repo, opts.specId, runId);
     const createCheck =
       opts.createCheck ??
-      (async (lease: Lease) => createNamedCheck(opts.home, lease));
-    const check = await createCheck({ ...reserved.lease, runId });
+      (async (next: Lease) => createNamedCheck(opts.home, next));
+    const check = await createCheck({ ...lease, runId });
     if ("error" in check) {
-      if (opts.stopAgent) await opts.stopAgent(runId);
-      await clearLease(opts.home, opts.repo, opts.specId);
+      await stopThenMaybeClear({ ...opts, runId });
       return { status: "ping", reason: "check_create_failed" };
     }
     await recordCheckRoutineId(opts.home, opts.repo, opts.specId, check.checkRoutineId);
     return {
       status: "launched",
       payload,
-      lease: { ...reserved.lease, runId, checkRoutineId: check.checkRoutineId },
+      lease: { ...lease, runId, checkRoutineId: check.checkRoutineId },
     };
   } catch {
-    if (opts.stopAgent) await opts.stopAgent(runId);
-    await clearLease(opts.home, opts.repo, opts.specId);
+    await stopThenMaybeClear({ ...opts, runId });
     return { status: "ping", reason: "check_create_failed" };
   }
+}
+
+export async function pickupAndLaunch(opts: {
+  home: string;
+  templatePath: string;
+  repo: string;
+  specId: string;
+  fields: ClassifyFields;
+  ref: LaunchRef;
+  canLaunch: boolean;
+  post: (payload: LaunchPayload) => Promise<{ runId: string }>;
+  createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  stopAgent?: (runId: string) => Promise<void>;
+  continueFlight?: boolean;
+}): Promise<PickupResult> {
+  loadLiveHowToRun(opts.home, opts.templatePath);
+  const job = classifyNextJob(opts.fields);
+  if (job === "stop") {
+    await clearLease(opts.home, opts.repo, opts.specId);
+    return { status: "stop" };
+  }
+  if (job === "watch-or-fix" && !opts.continueFlight) return { status: "watch-or-fix" };
+
+  const reserved = await reserveSlot(opts.home, opts.repo, opts.specId);
+  if (reserved.status === "cap_full") return { status: "wait" };
+
+  if (reserved.status === "already") {
+    const existing = reserved.lease;
+    const complete = Boolean(existing.runId && existing.checkRoutineId);
+    if (!opts.continueFlight && complete) return { status: "already", lease: existing };
+    if (!opts.canLaunch) return { status: "already", lease: existing };
+    if (!opts.continueFlight && existing.runId && !existing.checkRoutineId) {
+      return persistRunAndCheck(opts, existing, {
+        prompt: { text: promptForJob(job, opts.specId) },
+        source: { repository: `https://github.com/${opts.repo}`, ref: opts.ref.kind === "pr" ? opts.ref.head : opts.ref.branch },
+        clientAgentId: existing.clientAgentId,
+      }, existing.runId);
+    }
+    if (opts.continueFlight) {
+      cancelBuildRunCheck(opts.home, leaseCheckId(existing, opts.repo, opts.specId));
+      const nextClientId = clientAgentIdFor(`${existing.key}:${existing.runId ?? "0"}`);
+      return postAndPersist(opts, existing, job, nextClientId);
+    }
+    return postAndPersist(opts, existing, job, existing.clientAgentId);
+  }
+
+  if (!opts.canLaunch) {
+    await clearLease(opts.home, opts.repo, opts.specId);
+    return { status: "ping", reason: "cannot_launch" };
+  }
+  return postAndPersist(opts, reserved.lease, job, reserved.lease.clientAgentId);
 }
 
 export async function pickupReadySpecs(opts: {
@@ -536,7 +622,7 @@ export type ArtifactReader = (input: {
 export type DoneWakeResult =
   | { status: "unknown"; cancelled: true; runStatus: RunStatus }
   | { status: "continue"; cancelled: true; runStatus: RunStatus; artifact: WakeArtifact }
-  | { status: "judge"; cancelled: true }
+  | { status: "judge"; cancelled: boolean }
   | { status: "stale"; cancelled: false };
 
 export type CheckFireResult =
@@ -588,16 +674,21 @@ export async function handleDoneWake(opts: {
   }
   const checkRoutineId = leaseCheckId(lease, opts.repo, opts.specId);
   cancelBuildRunCheck(opts.home, checkRoutineId);
-  const run = await opts.getRun(opts.runId);
-  return afterCancelledBuildRun({
-    home: opts.home,
-    repo: opts.repo,
-    specId: opts.specId,
-    hint: opts.hint,
-    runStatus: run.status,
-    readArtifact: opts.readArtifact,
-    expectedRunId: opts.runId,
-  });
+  try {
+    const run = await opts.getRun(opts.runId);
+    return afterCancelledBuildRun({
+      home: opts.home,
+      repo: opts.repo,
+      specId: opts.specId,
+      hint: opts.hint,
+      runStatus: run.status,
+      readArtifact: opts.readArtifact,
+      expectedRunId: opts.runId,
+    });
+  } catch {
+    createNamedCheck(opts.home, lease);
+    return { status: "judge", cancelled: false };
+  }
 }
 
 export async function handleCheckFire(opts: {
@@ -618,12 +709,16 @@ export async function handleCheckFire(opts: {
 
   if (opts.specStatus !== "open" || opts.leaseCleared || !lease) {
     deleteCheck(opts.home, checkRoutineId);
+    if (lease && opts.specStatus !== "open") {
+      await clearLease(opts.home, opts.repo, opts.specId);
+    }
     return { status: "stop", deleted: true, reason: "merged_or_cleared" };
   }
 
   if (purpose === "pr-watch") {
     if (opts.hasOpenUnmergedPr) return { status: "pr-watch-or-fix", deleted: false };
     deleteCheck(opts.home, checkRoutineId);
+    await clearLease(opts.home, opts.repo, opts.specId);
     return { status: "stop", deleted: true, reason: "orphan" };
   }
 
@@ -648,6 +743,7 @@ export async function handleCheckFire(opts: {
 
   if (run.status !== "RUNNING") {
     deleteCheck(opts.home, checkRoutineId);
+    await clearLease(opts.home, opts.repo, opts.specId);
     return { status: "stop", deleted: true, reason: "orphan" };
   }
 
@@ -680,6 +776,7 @@ export type JudgeVerdict = {
 };
 
 const LEAVES_FLIGHT: ReadonlySet<StayAction> = new Set(["merge", "ask", "ping"]);
+const FOLLOW_UP: ReadonlySet<StayAction> = new Set(["retry", "next-job", "fix-agent"]);
 
 export function notifyHopFor(action: StayAction): NotifyHop {
   if (action === "ask") return "ASKED";
@@ -712,7 +809,8 @@ export function judgeStay(input: JudgeInput): JudgeVerdict {
     return finish("hold");
   }
 
-  if (input.nextJob && input.nextJob !== "stop" && input.nextJob !== "watch-or-fix") {
+  if (input.nextJob === "stop") return finish("merge");
+  if (input.nextJob && input.nextJob !== "watch-or-fix") {
     return finish("next-job");
   }
 
@@ -737,6 +835,7 @@ export async function completeStay(opts: {
   verdict: JudgeVerdict;
   readyInFiringRepo: ReadySpec[];
   readyInOtherRepos?: ReadySpec[];
+  followUp?: ReadySpec;
   canLaunch: boolean;
   post: (payload: LaunchPayload) => Promise<{ runId: string }>;
   createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
@@ -747,7 +846,27 @@ export async function completeStay(opts: {
   let checkDisabled = false;
   let filled: PickupResult[] = [];
 
-  if (LEAVES_FLIGHT.has(opts.verdict.action)) {
+  if (FOLLOW_UP.has(opts.verdict.action)) {
+    const current =
+      opts.followUp ?? opts.readyInFiringRepo.find((spec) => spec.specId === opts.specId);
+    if (current) {
+      filled = [
+        await pickupAndLaunch({
+          home: opts.home,
+          templatePath: opts.templatePath,
+          repo: opts.firingRepo,
+          specId: opts.specId,
+          fields: current.fields,
+          ref: current.ref,
+          canLaunch: opts.canLaunch,
+          post: opts.post,
+          createCheck: opts.createCheck,
+          stopAgent: opts.stopAgent,
+          continueFlight: true,
+        }),
+      ];
+    }
+  } else if (LEAVES_FLIGHT.has(opts.verdict.action)) {
     const key = leaseKey(opts.firingRepo, opts.specId);
     const lease = readLedgerFile(botPaths(opts.home).ledger).leases[key];
     const checkId = leaseCheckId(lease, opts.firingRepo, opts.specId);

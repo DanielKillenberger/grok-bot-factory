@@ -48,6 +48,7 @@ test("after a readable result the stay chooses retry, next-job, merge, fix-agent
     ["fix-agent", { readable: true, finishedJob: "make-pr", ciOrReviewNeedsFix: true }],
     ["ask", { readable: true, ownerAsk: true, rounds: 3 }],
     ["ping", { readable: true, stuck: true, rounds: 3 }],
+    ["merge", { readable: true, finishedJob: "work-rolling", nextJob: "stop" }],
   ];
   for (const [action, input] of cases) {
     expect(judgeStay(input).action, action).toBe(action);
@@ -178,6 +179,45 @@ test("escalate clears the lease and disables the check", async () => {
   expect(readCheckRoutine(home, checkId)).toBeNull();
   expect(done.filled.filter((r) => r.status === "launched")).toHaveLength(1);
   expect(readLedgerFile(botPaths(home).ledger).leases["acme/app fn-2"]?.runId).toBe("run-fn-2");
+});
+
+test("retry, next-job, and fix-agent launch on the same lease", async () => {
+  const launched = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-plan" }),
+  });
+  expect(launched.status).toBe("launched");
+  const afterPlan: ClassifyFields = {
+    ...firstLaunch,
+    hasPlan: true,
+    planReviewStatus: null,
+  };
+  const posted: string[] = [];
+  const next = await completeStay({
+    home,
+    templatePath: TEMPLATE,
+    firingRepo: "acme/app",
+    specId: "fn-1",
+    verdict: judgeStay({ readable: true, finishedJob: "plan", nextJob: "plan-review" }),
+    readyInFiringRepo: [],
+    followUp: { specId: "fn-1", fields: afterPlan, ref: { kind: "spec-branch", branch: "fn-1" } },
+    canLaunch: true,
+    post: async (payload) => {
+      posted.push(payload.prompt.text);
+      return { runId: "run-plan-review" };
+    },
+  });
+  expect(next.action).toBe("next-job");
+  expect(next.leaseCleared).toBe(false);
+  expect(posted).toHaveLength(1);
+  expect(posted[0]).toContain("/flow-next:plan-review");
+  expect(readLedgerFile(botPaths(home).ledger).leases["acme/app fn-1"]?.runId).toBe("run-plan-review");
 });
 
 test("freed slot under 10 fills from the firing repo only; cap-full is quiet wait", async () => {
