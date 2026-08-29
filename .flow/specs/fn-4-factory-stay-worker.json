@@ -1,7 +1,7 @@
 {
   "branch_name": "fn-4-factory-stay-worker",
-  "completion_review_status": "needs_work",
-  "completion_reviewed_at": "2026-08-29T00:02:24.579348Z",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-08-29T00:05:58.893441Z",
   "created_at": "2026-08-28T15:45:19.208654Z",
   "default_impl": null,
   "default_review": null,
@@ -20,7 +20,7 @@
     "fn-4-factory-stay-worker.5": 0
   },
   "next_task": null,
-  "plan_review_rounds": 1,
+  "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-08-28T23:12:41.151447Z",
   "ready": false,
@@ -1052,6 +1052,55 @@
       "task": null,
       "timestamp": "2026-08-29T00:02:24.310239Z",
       "verdict": "NEEDS_WORK"
+    },
+    {
+      "artifact_sha256": "d20b3e7803322b3ebb012c11f477c22eb85fbfd22a735d08b0de0d702bec1767",
+      "backend": "host",
+      "counter_kind": "plan",
+      "failure_class": null,
+      "finalized": {
+        "digest": "complete",
+        "receipt": "complete",
+        "status": "complete"
+      },
+      "findings_digest": {
+        "backend": "host",
+        "digest_truncated": false,
+        "items": [
+          {
+            "chainRoot": "finding-bad79ddcea955fa28613677ac80026ba",
+            "classification": "introduced",
+            "findingId": "finding-bad79ddcea955fa28613677ac80026ba",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          },
+          {
+            "chainRoot": "finding-60e3d9322127784367b373ca6a8d3270",
+            "classification": "introduced",
+            "findingId": "finding-60e3d9322127784367b373ca6a8d3270",
+            "firstSeenThisRound": false,
+            "severity": "P1",
+            "status": "fixed"
+          }
+        ],
+        "reviewKind": "completion"
+      },
+      "forced": false,
+      "hash_epoch": 0,
+      "head_sha": "d91d6d5edcb5c776a46b30d32c35ab2084f4bc4a",
+      "head_sha_observed": false,
+      "kind": "completion",
+      "outcome": "verdict",
+      "output_bytes": 2847,
+      "output_sha256": "b1ddef00ef4c3ce1560ae44d512799fdccbeb9112daa55d3b538a92709ef9827",
+      "reservation_id": "670cb72195e3420797d4d82519a4c6ea",
+      "round_consumed": true,
+      "scope": "completion",
+      "superseded_by": null,
+      "task": null,
+      "timestamp": "2026-08-29T00:05:58.630051Z",
+      "verdict": "SHIP"
     }
   ],
   "review_hash_epoch": {
@@ -1061,7 +1110,7 @@
     "impl:fn-4-factory-stay-worker.4": 1,
     "impl:fn-4-factory-stay-worker.5": 1,
     "plan": 1,
-    "plan#completion": 0
+    "plan#completion": 1
   },
   "review_pending_rounds": {},
   "review_reservations": {},
@@ -1088,5 +1137,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-08-29T00:02:24.580147Z"
+  "updated_at": "2026-08-29T00:05:58.894052Z"
 }
