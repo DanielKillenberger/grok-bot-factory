@@ -18,7 +18,7 @@ import {
   type ClassifyFields,
   type RunStatus,
 } from "../../factory/lib/coordinator.ts";
-import { ROOT, tempDir } from "./helpers.ts";
+import { ROOT, memoryCheckClock, tempDir } from "./helpers.ts";
 
 const COORD_SKILL = join(ROOT, "skills/factory-coordinator/SKILL.md");
 const TEMPLATE = join(ROOT, "skills/factory-coordinator/assets/how-to-run.template.md");
@@ -35,9 +35,11 @@ const firstLaunch: ClassifyFields = {
 };
 
 let home = "";
+let clock = memoryCheckClock();
 
 beforeEach(() => {
   home = tempDir();
+  clock = memoryCheckClock();
 });
 
 afterEach(() => {
@@ -54,6 +56,7 @@ async function seedBuildRun(runId = "run-1", specId = "fn-1") {
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => ({ runId }),
   });
   expect(result.status).toBe("launched");
@@ -75,6 +78,7 @@ test("done-wake and a finished-check cancel the build-run check before the next 
       return { status: "FINISHED" };
     },
     readArtifact: async () => ({ kind: "transcript", path: "/tmp/transcript.json" }),
+    clock,
   });
   expect(checkAtGet).toBeNull();
   expect(wake).toEqual({
@@ -98,6 +102,7 @@ test("done-wake and a finished-check cancel the build-run check before the next 
       checkAtRead = readCheckRoutine(home, again.checkRoutineId);
       return { kind: "git", summary: "plan committed" };
     },
+    clock,
   });
   expect(checkAtRead).toBeNull();
   expect(fired).toMatchObject({ status: "continue", cancelled: true, runStatus: "FINISHED" });
@@ -115,6 +120,7 @@ test("GET failure after cancel recreates the check so the hang detector stays", 
       throw new Error("getRun failed");
     },
     readArtifact: async () => ({ kind: "git", summary: "unused" }),
+    clock,
   });
   expect(result).toEqual({ status: "judge", cancelled: false });
   expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
@@ -130,6 +136,7 @@ test("FINISHED with no readable artifact is unknown, not phase done", async () =
     hint: { finished: true },
     getRun: async () => ({ status: "FINISHED" }),
     readArtifact: async () => null,
+    clock,
   });
   expect(result).toEqual({ status: "unknown", cancelled: true, runStatus: "FINISHED" });
   expect(result.status).not.toBe("continue");
@@ -150,6 +157,7 @@ test("stale done-wake for a prior run does not cancel the current run's check", 
       return { status: "FINISHED" };
     },
     readArtifact: async () => ({ kind: "git", summary: "stale" }),
+    clock,
   });
   expect(stale).toEqual({ status: "stale", cancelled: false });
   expect(gotRun).toBeUndefined();
@@ -163,6 +171,7 @@ test("stale done-wake for a prior run does not cancel the current run's check", 
     hint: { finished: true },
     getRun: async () => ({ status: "FINISHED" }),
     readArtifact: async () => ({ kind: "git", summary: "ghost" }),
+    clock,
   });
   expect(missing).toEqual({ status: "stale", cancelled: false });
 });
@@ -178,10 +187,11 @@ test("done-wake does not cancel a replacement run's check created during GET", a
     getRun: async () => {
       await recordRunId(home, seeded.repo, seeded.specId, "run-b");
       const lease = readLedgerFile(botPaths(home).ledger).leases[`${seeded.repo} ${seeded.specId}`]!;
-      createNamedCheck(home, { ...lease, runId: "run-b" });
+      await createNamedCheck(home, { ...lease, runId: "run-b" }, clock);
       return { status: "FINISHED" };
     },
     readArtifact: async () => ({ kind: "git", summary: "old" }),
+    clock,
   });
   expect(result).toEqual({ status: "stale", cancelled: false });
   expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
@@ -197,10 +207,11 @@ test("done-wake does not cancel a replacement run's check created during GET", a
     getRun: async () => {
       await recordRunId(checkHome, again.repo, again.specId, "run-d");
       const lease = readLedgerFile(botPaths(checkHome).ledger).leases[`${again.repo} ${again.specId}`]!;
-      createNamedCheck(checkHome, { ...lease, runId: "run-d" });
+      await createNamedCheck(checkHome, { ...lease, runId: "run-d" }, clock);
       return { status: "FINISHED" };
     },
     readArtifact: async () => ({ kind: "git", summary: "old-check" }),
+    clock,
   });
   expect(fired).toEqual({ status: "stale", cancelled: false });
   expect(readCheckRoutine(checkHome, again.checkRoutineId)).not.toBeNull();
@@ -211,7 +222,7 @@ test("after make-pr, cancel then retarget the same per-spec routine as a PR watc
   const id = seeded.checkRoutineId;
   expect(readCheckRoutine(home, id)?.purpose).toBe("build-run");
 
-  cancelBuildRunCheck(home, id);
+  await cancelBuildRunCheck(home, id, clock);
   expect(readCheckRoutine(home, id)).toBeNull();
   expect(existsSync(checkRoutinePath(home, id))).toBe(false);
 
@@ -224,17 +235,22 @@ test("after make-pr, cancel then retarget the same per-spec routine as a PR watc
     intervalMinutes: 30,
     purpose: "pr-watch",
   });
-  expect(cancelBuildRunCheck(home, id)).toEqual({ cancelled: false });
+  expect(await cancelBuildRunCheck(home, id, clock)).toEqual({ cancelled: false });
   expect(readCheckRoutine(home, id)?.purpose).toBe("pr-watch");
 });
 
-test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, then still-running judge", async () => {
+test("check-fire order is merged/cleared, then PR-watch, then missed-wake continue, then hang ping", async () => {
   expect(TEMPLATE).toBe(SHIPPED_HOW_TO_RUN_TEMPLATE);
   const skill = readFileSync(COORD_SKILL, "utf8");
   expect(skill).toMatch(/spec merged or lease cleared/);
   expect(skill).toMatch(/open unmerged PR and no build agent/);
-  expect(skill).toMatch(/no agent and no open PR/);
-  expect(skill).toMatch(/agent still running → judge/);
+  expect(skill).toMatch(/missed wake/);
+  expect(skill).toMatch(/keep the lease and continue from git/);
+  expect(skill).toMatch(/agent still running → hang/);
+  expect(skill).toMatch(/Escalate-ping/);
+  expect(skill).toMatch(/JSON ledger entry alone is not a check/);
+  expect(skill).toMatch(/The factory does not call `\/land`/);
+  expect(skill).toMatch(/The coordinator merges/);
   expect(skill).toMatch(/Do not register a Cloud Agent HMAC receiver/);
   expect(skill).toMatch(/Do not add a factory-wide checker/);
   const forward = readFileSync(FORWARD, "utf8");
@@ -248,7 +264,8 @@ test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, the
     hasOpenUnmergedPr: boolean;
     run: RunStatus;
     purpose?: "build-run" | "pr-watch";
-    want: { status: string; reason?: string; deleted?: boolean };
+    want: Record<string, unknown>;
+    leaseKept?: boolean;
   }> = [
     {
       name: "merged",
@@ -271,6 +288,7 @@ test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, the
       hasOpenUnmergedPr: true,
       run: "GONE",
       want: { status: "pr-watch-or-fix", deleted: false },
+      leaseKept: true,
     },
     {
       name: "PR-watch purpose",
@@ -279,25 +297,43 @@ test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, the
       run: "FINISHED",
       purpose: "pr-watch",
       want: { status: "pr-watch-or-fix", deleted: false },
+      leaseKept: true,
     },
     {
-      name: "orphan",
+      name: "PR-watch no PR",
       specStatus: "open",
       hasOpenUnmergedPr: false,
       run: "GONE",
+      purpose: "pr-watch",
       want: { status: "stop", reason: "orphan", deleted: true },
     },
     {
-      name: "still running",
+      name: "missed wake",
+      specStatus: "open",
+      hasOpenUnmergedPr: false,
+      run: "GONE",
+      want: {
+        status: "continue",
+        cancelled: true,
+        runStatus: "GONE",
+        reason: "missed-wake",
+        artifact: { kind: "git", summary: "missed-wake" },
+      },
+      leaseKept: true,
+    },
+    {
+      name: "hang",
       specStatus: "open",
       hasOpenUnmergedPr: false,
       run: "RUNNING",
-      want: { status: "judge", deleted: false },
+      want: { status: "hang", deleted: false, notify: "NEEDS_HUMAN" },
+      leaseKept: true,
     },
   ];
 
   for (const c of cases) {
     const caseHome = tempDir();
+    const caseClock = memoryCheckClock();
     const launched = await pickupAndLaunch({
       home: caseHome,
       templatePath: TEMPLATE,
@@ -306,6 +342,7 @@ test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, the
       fields: firstLaunch,
       ref: { kind: "spec-branch", branch: "fn-1" },
       canLaunch: true,
+      clock: caseClock,
       post: async () => ({ runId: `run-${c.name}` }),
     });
     expect(launched.status).toBe("launched");
@@ -320,14 +357,22 @@ test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, the
       hasOpenUnmergedPr: c.hasOpenUnmergedPr,
       getRun: async () => ({ status: c.run }),
       readArtifact: async () => ({ kind: "git", summary: c.name }),
+      clock: caseClock,
     });
     expect(fired, c.name).toMatchObject(c.want);
+    expect(fired.status, c.name).not.toBe("judge");
     if (c.want.deleted) {
       expect(readCheckRoutine(caseHome, launched.lease.checkRoutineId!), c.name).toBeNull();
-    } else {
+    } else if (c.name !== "missed wake") {
       expect(readCheckRoutine(caseHome, launched.lease.checkRoutineId!), c.name).not.toBeNull();
     }
-    if (c.name === "orphan" || c.name === "merged") {
+    if (c.leaseKept) {
+      expect(
+        readLedgerFile(botPaths(caseHome).ledger).leases["acme/app fn-1"],
+        c.name,
+      ).toBeDefined();
+    }
+    if (c.name === "PR-watch no PR" || c.name === "merged") {
       expect(
         readLedgerFile(botPaths(caseHome).ledger).leases["acme/app fn-1"],
         c.name,
@@ -337,7 +382,7 @@ test("check-fire order is merged/cleared, then PR-watch, then orphan-delete, the
   }
 });
 
-test("still-running check fire is coordinator judgment; no look-count auto-ping", async () => {
+test("still-running check fire is hang ping; look-count does not auto-ping", async () => {
   const seeded = await seedBuildRun();
   const result = await handleCheckFire({
     home,
@@ -346,13 +391,37 @@ test("still-running check fire is coordinator judgment; no look-count auto-ping"
     specStatus: "open",
     hasOpenUnmergedPr: false,
     getRun: async () => ({ status: "RUNNING" }),
+    clock,
   });
-  expect(result).toEqual({ status: "judge", deleted: false });
-  expect(result).not.toHaveProperty("lookCount");
-  expect(result).not.toHaveProperty("ping");
+  expect(result).toEqual({ status: "hang", deleted: false, notify: "NEEDS_HUMAN" });
+  expect(result.status).not.toBe("judge");
   expect(result.status).not.toBe("stop");
+  expect(result).not.toHaveProperty("lookCount");
   expect(readCheckRoutine(home, seeded.checkRoutineId)?.purpose).toBe("build-run");
   expect("lookCount" in (readCheckRoutine(home, seeded.checkRoutineId) ?? {})).toBe(false);
+  expect(readLedgerFile(botPaths(home).ledger).leases[`${seeded.repo} ${seeded.specId}`]).toBeDefined();
+});
+
+test("missed wake keeps the lease and continues from git", async () => {
+  const seeded = await seedBuildRun();
+  const result = await handleCheckFire({
+    home,
+    repo: seeded.repo,
+    specId: seeded.specId,
+    specStatus: "open",
+    hasOpenUnmergedPr: false,
+    getRun: async () => ({ status: "GONE" }),
+    clock,
+  });
+  expect(result).toEqual({
+    status: "continue",
+    cancelled: true,
+    runStatus: "GONE",
+    reason: "missed-wake",
+    artifact: { kind: "git", summary: "missed-wake" },
+  });
+  expect(result.status).not.toBe("stop");
+  expect(readLedgerFile(botPaths(home).ledger).leases[`${seeded.repo} ${seeded.specId}`]).toBeDefined();
 });
 
 test("PR-watch self-destructs on merge or cleared lease; open PR is not orphan-deleted", async () => {
@@ -369,6 +438,7 @@ test("PR-watch self-destructs on merge or cleared lease; open PR is not orphan-d
     getRun: async () => {
       throw new Error("PR-watch must not GET a build run");
     },
+    clock,
   });
   expect(kept).toEqual({ status: "pr-watch-or-fix", deleted: false });
   expect(readCheckRoutine(home, seeded.checkRoutineId)?.purpose).toBe("pr-watch");
@@ -382,6 +452,7 @@ test("PR-watch self-destructs on merge or cleared lease; open PR is not orphan-d
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => ({ runId: "run-merged" }),
   });
   expect(merged.status).toBe("launched");
@@ -394,11 +465,12 @@ test("PR-watch self-destructs on merge or cleared lease; open PR is not orphan-d
     specStatus: "merged",
     hasOpenUnmergedPr: false,
     getRun: async () => ({ status: "GONE" }),
+    clock,
   });
   expect(gone).toEqual({ status: "stop", deleted: true, reason: "merged_or_cleared" });
   expect(readCheckRoutine(mergedHome, merged.lease.checkRoutineId!)).toBeNull();
 
-  deleteCheck(home, seeded.checkRoutineId);
+  await deleteCheck(home, seeded.checkRoutineId, clock);
   retargetAsPrWatch(home, seeded.lease);
   const cleared = await handleCheckFire({
     home,
@@ -408,6 +480,7 @@ test("PR-watch self-destructs on merge or cleared lease; open PR is not orphan-d
     leaseCleared: true,
     hasOpenUnmergedPr: true,
     getRun: async () => ({ status: "GONE" }),
+    clock,
   });
   expect(cleared).toEqual({ status: "stop", deleted: true, reason: "merged_or_cleared" });
   expect(readCheckRoutine(home, seeded.checkRoutineId)).toBeNull();

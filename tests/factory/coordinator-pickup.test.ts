@@ -20,7 +20,7 @@ import {
   writeLesson,
   type ClassifyFields,
 } from "../../factory/lib/coordinator.ts";
-import { ROOT, SKILL, tempDir } from "./helpers.ts";
+import { ROOT, SKILL, memoryCheckClock, tempDir } from "./helpers.ts";
 
 const COORD_SKILL = join(ROOT, "skills/factory-coordinator/SKILL.md");
 const TEMPLATE = join(ROOT, "skills/factory-coordinator/assets/how-to-run.template.md");
@@ -36,9 +36,11 @@ const firstLaunch: ClassifyFields = {
 };
 
 let home = "";
+let clock = memoryCheckClock();
 
 beforeEach(() => {
   home = tempDir();
+  clock = memoryCheckClock();
 });
 
 afterEach(() => {
@@ -88,6 +90,7 @@ test("ordered classify matrix lives in the skill and is used before the first la
     fields: { ...firstLaunch, specStatus: "merged" },
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => {
       posted = true;
       return { runId: "run-1" };
@@ -111,6 +114,7 @@ test("missing live file is copied, then read, before any launch", async () => {
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => {
       liveAtPost = readFileSync(paths.liveHowToRun, "utf8");
       return { runId: "run-1" };
@@ -169,6 +173,7 @@ test("lease key is repo plus spec id; lease and client agent id are written befo
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async (payload) => {
       leaseAtPost = readLedgerFile(botPaths(home).ledger).leases[key];
       expect(payload.clientAgentId).toBe(wantId);
@@ -192,7 +197,30 @@ test("lease key is repo plus spec id; lease and client agent id are written befo
     repo: "acme/app",
     specId: "fn-1",
     intervalMinutes: 30,
+    handle: `clock:${checkRoutineIdFor(key)}`,
   });
+  expect(clock.arms).toContain(checkRoutineIdFor(key));
+});
+
+test("a JSON ledger entry alone is not a check; create without an armed clock fails closed", async () => {
+  const skill = readFileSync(COORD_SKILL, "utf8");
+  expect(skill).toMatch(/JSON ledger entry alone is not a check/);
+  expect(skill).toMatch(/Do not invent a public Grok Bot REST client/);
+  expect(skill).toMatch(/bun factory\/check-fire\.ts/);
+  const key = leaseKey("acme/app", "fn-1");
+  const failed = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-unarmed" }),
+    stopAgent: async () => {},
+  });
+  expect(failed).toEqual({ status: "ping", reason: "check_create_failed" });
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]).toBeUndefined();
 });
 
 test("launch creates and persists the named per-spec 30-minute check; create fail stops the agent and pings", async () => {
@@ -247,6 +275,7 @@ test("pickup starts every ready spec in the firing repo until the 10-spec cap", 
       fields: firstLaunch,
       ref: { kind: "spec-branch" as const, branch: `fn-${i}` },
     })),
+    clock,
     post: async (payload) => {
       posted.push(payload.source.ref);
       return { runId: `run-${payload.source.ref}` };
@@ -281,6 +310,7 @@ test("in-flight later push is ignore even when launch is currently impossible", 
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => ({ runId: "run-live" }),
   });
   expect(launched.status).toBe("launched");
@@ -293,6 +323,7 @@ test("in-flight later push is ignore even when launch is currently impossible", 
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: false,
+    clock,
     post: async () => {
       posted = true;
       return { runId: "should-not-post" };
@@ -314,6 +345,7 @@ test("a crash lease without a run id is reconciled instead of ignored as in-flig
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => ({ runId: "run-reconcile" }),
   });
   expect(recovered.status).toBe("launched");
@@ -413,6 +445,7 @@ test("busy-agent conflict retries once, then pings", async () => {
       if (posts === 1) throw busy;
       return { runId: "run-retry" };
     },
+    clock,
   });
   expect(recovered.status).toBe("launched");
   expect(posts).toBe(2);

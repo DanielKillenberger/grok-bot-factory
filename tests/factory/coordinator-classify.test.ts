@@ -11,7 +11,7 @@ import {
   type ClassifyFields,
   type NamedJob,
 } from "../../factory/lib/coordinator.ts";
-import { ROOT, tempDir } from "./helpers.ts";
+import { ROOT, memoryCheckClock, tempDir } from "./helpers.ts";
 
 const COORD_SKILL = join(ROOT, "skills/factory-coordinator/SKILL.md");
 const TEMPLATE = join(ROOT, "skills/factory-coordinator/assets/how-to-run.template.md");
@@ -138,6 +138,7 @@ test("prompts name the matching flow-next skill, stay on spec or PR branch, and 
     fields: afterWorkRolling,
     ref: launchRefForPhase({ specBranch: "fn-4", appearedBranch: "cursor/abc-123" }),
     canLaunch: true,
+    clock: memoryCheckClock(),
     post: async (payload) => {
       expect(payload.prompt.text).toContain("/flow-next:spec-completion-review");
       expect(payload.prompt.text).not.toMatch(/\/flow-next:land|\bland\b|\/pilot|\/flow-next:impl-review/);

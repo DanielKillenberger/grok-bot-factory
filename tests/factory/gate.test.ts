@@ -216,6 +216,14 @@ test("envelope User-Agent recovers identity and starts", async () => {
   expect(trimNL(res.stdout)).toBe(`acme/app ${SHA} pilot`);
 });
 
+test("factory-check User-Agent starts the coordinator even when the inbox is empty", async () => {
+  const empty = await runGate([join(FIX, "push-ok.json")], "empty");
+  expect(empty.code).toBe(0);
+  const res = await runGate([join(FIX, "envelope-check.json")], "empty");
+  expect(res.code).toBe(10);
+  expect(trimNL(res.stdout)).toBe(`acme/app ${SHA} check fn-1`);
+});
+
 test("envelope without User-Agent is stuck not quiet", async () => {
   const res = await runGate([join(FIX, "envelope-no-ua.json")], "pilot");
   expect(res.code).toBe(20);

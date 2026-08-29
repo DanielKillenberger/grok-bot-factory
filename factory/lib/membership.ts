@@ -77,7 +77,7 @@ export async function probeFlowDir(
 
 export async function membershipCheck(
   fullName: string,
-  after: string,
+  after?: string,
 ): Promise<{ result: MemberResult; reason?: string }> {
   const members = membersList();
   if (members.length > 0) {

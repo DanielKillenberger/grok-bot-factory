@@ -26,7 +26,7 @@ Use the gate exit code. Preserve stderr.
 | Exit | Meaning | Next |
 |------|---------|------|
 | 0 | quiet | stop. No ping. |
-| 10 | start (`repo sha kind` on stdout) | invoke `skills/factory-coordinator/SKILL.md` for that repo. The stdout kind is not the job. Do not run `factory/tick.ts`. |
+| 10 | start (`repo sha kind` on stdout) | invoke `skills/factory-coordinator/SKILL.md` for that repo. The stdout kind is not the job. If kind is `check <specId>`, that wake is the per-spec 30-minute check: hang or missed-wake, not a new pickup. Do not run `factory/tick.ts`. |
 | 20 | stuck | `bun factory/notify.ts --from-exit 20 --reason "<stderr>"` |
 
 Exit 0 stays quiet. Exit 20 stays on `factory/notify.ts`. Do not invoke `factory/tick.ts` on start.

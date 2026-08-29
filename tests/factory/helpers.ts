@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import type { CheckClock } from "../../factory/lib/coordinator.ts";
 
 export const ROOT = join(import.meta.dir, "../..");
 export const GATE = join(ROOT, "factory/gate.ts");
@@ -8,6 +9,7 @@ export const TICK = join(ROOT, "factory/tick.ts");
 export const NOTIFY = join(ROOT, "factory/notify.ts");
 export const DISCOVER = join(ROOT, "factory/discover.ts");
 export const INSTALL = join(ROOT, "factory/install.ts");
+export const CHECK_FIRE = join(ROOT, "factory/check-fire.ts");
 export const FIX = join(ROOT, "tests/fixtures");
 export const STUB_GH = join(ROOT, "tests/factory/stub-gh.ts");
 export const STUB_GH_DISCOVER = join(ROOT, "tests/factory/stub-gh-discover.ts");
@@ -26,6 +28,23 @@ export type ProcResult = {
 
 export function tempDir(): string {
   return mkdtempSync(join(tmpdir(), "factory-test-"));
+}
+
+export function memoryCheckClock(): CheckClock & { arms: string[]; disarms: string[] } {
+  const arms: string[] = [];
+  const disarms: string[] = [];
+  return {
+    arms,
+    disarms,
+    arm: async (routine) => {
+      arms.push(routine.id);
+      return { handle: `clock:${routine.id}` };
+    },
+    disarm: async (routine) => {
+      disarms.push(routine.id);
+      return { disarmed: true };
+    },
+  };
 }
 
 export function cleanEnv(

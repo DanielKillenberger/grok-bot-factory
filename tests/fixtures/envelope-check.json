@@ -1,0 +1,7 @@
+{
+  "headers": {
+    "User-Agent": "factory-check repo=acme/app spec=fn-1 sha=0123456789abcdef0123456789abcdef01234567 ref=refs/heads/fn-1"
+  },
+  "body_digest": "deadbeef",
+  "timestamp_ms": 1
+}

@@ -110,23 +110,120 @@ export type CheckRoutine = {
   specId: string;
   intervalMinutes: 30;
   purpose: CheckPurpose;
+  handle: string;
+};
+
+export type CheckClock = {
+  arm: (routine: CheckRoutine) => Promise<{ handle: string } | { error: "cannot_create" }>;
+  disarm: (routine: Pick<CheckRoutine, "id"> & { handle?: string }) => Promise<{ disarmed: boolean }>;
 };
 
 export function checkRoutinePath(home: string, checkRoutineId: string): string {
   return join(botPaths(home).routines, `${checkRoutineId.replace(/[/\\]/g, "_")}.json`);
 }
 
-export function createNamedCheck(home: string, lease: Lease): { checkRoutineId: string } {
+export function isArmedCheck(
+  routine: CheckRoutine | null,
+): routine is CheckRoutine & { handle: string } {
+  return Boolean(routine && routine.handle.trim() !== "");
+}
+
+export function factoryWebhookSecrets(
+  env: Record<string, string | undefined> = process.env,
+): { url: string; key: string } | { error: "cannot_create" } {
+  const url = env.GROK_BOT_WEBHOOK_URL || env.FACTORY_ROUTINE_URL || "";
+  const key = env.GROK_BOT_SENDER_KEY || env.FACTORY_SENDER_KEY || "";
+  if (!url || !key) return { error: "cannot_create" };
+  return { url, key };
+}
+
+export function buildFactoryCheckWebhookPost(input: {
+  url: string;
+  key: string;
+  repo: string;
+  specId: string;
+  purpose: CheckPurpose;
+  sha?: string;
+}): { url: string; method: "POST"; headers: Record<string, string>; body: string } {
+  const sha = input.sha ?? "0000000000000000000000000000000000000000";
+  const ua = `factory-check repo=${input.repo} spec=${input.specId} sha=${sha} ref=refs/heads/${input.specId}`;
+  return {
+    url: input.url,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.key}`,
+      "Content-Type": "application/json",
+      "User-Agent": ua,
+    },
+    body: `${JSON.stringify({
+      kind: "factory-check",
+      repo: input.repo,
+      specId: input.specId,
+      purpose: input.purpose,
+    })}\n`,
+  };
+}
+
+export async function postFactoryCheckWebhook(
+  input: {
+    url: string;
+    key: string;
+    repo: string;
+    specId: string;
+    purpose: CheckPurpose;
+    sha?: string;
+  },
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true } | { error: "cannot_create" | "post_failed" }> {
+  if (!input.url || !input.key) return { error: "cannot_create" };
+  const req = buildFactoryCheckWebhookPost(input);
+  try {
+    const res = await fetchImpl(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+    });
+    if (!res.ok) return { error: "post_failed" };
+    return { ok: true };
+  } catch {
+    return { error: "post_failed" };
+  }
+}
+
+export function webhookRepostClock(opts: {
+  schedule: CheckClock;
+  secrets?: { url: string; key: string } | { error: "cannot_create" };
+}): CheckClock {
+  return {
+    arm: async (routine) => {
+      const secrets = opts.secrets ?? factoryWebhookSecrets();
+      if ("error" in secrets) return { error: "cannot_create" };
+      void secrets;
+      return opts.schedule.arm(routine);
+    },
+    disarm: (routine) => opts.schedule.disarm(routine),
+  };
+}
+
+export async function createNamedCheck(
+  home: string,
+  lease: Lease,
+  clock: CheckClock,
+): Promise<{ checkRoutineId: string } | { error: "cannot_create" }> {
   const checkRoutineId = checkRoutineIdFor(lease.key);
-  const path = checkRoutinePath(home, checkRoutineId);
-  mkdirSync(dirname(path), { recursive: true });
-  const routine: CheckRoutine = {
+  const draft: CheckRoutine = {
     id: checkRoutineId,
     repo: lease.repo,
     specId: lease.specId,
     intervalMinutes: 30,
     purpose: "build-run",
+    handle: "",
   };
+  const armed = await clock.arm(draft);
+  if ("error" in armed || !armed.handle.trim()) return { error: "cannot_create" };
+  const path = checkRoutinePath(home, checkRoutineId);
+  mkdirSync(dirname(path), { recursive: true });
+  const routine: CheckRoutine = { ...draft, handle: armed.handle };
   writeFileSync(path, `${JSON.stringify(routine, null, 2)}\n`);
   return { checkRoutineId };
 }
@@ -142,26 +239,38 @@ export function readCheckRoutine(home: string, checkRoutineId: string): CheckRou
     specId: parsed.specId ?? "",
     intervalMinutes: 30,
     purpose,
+    handle: typeof parsed.handle === "string" ? parsed.handle : "",
   };
 }
 
-export function deleteCheck(home: string, checkRoutineId: string): { deleted: boolean } {
+export async function deleteCheck(
+  home: string,
+  checkRoutineId: string,
+  clock?: CheckClock,
+): Promise<{ deleted: boolean }> {
   const path = checkRoutinePath(home, checkRoutineId);
+  const routine = readCheckRoutine(home, checkRoutineId);
+  if (clock && routine) await clock.disarm(routine);
   if (!existsSync(path)) return { deleted: false };
   unlinkSync(path);
   return { deleted: true };
 }
 
-export function cancelBuildRunCheck(home: string, checkRoutineId: string): { cancelled: boolean } {
+export async function cancelBuildRunCheck(
+  home: string,
+  checkRoutineId: string,
+  clock?: CheckClock,
+): Promise<{ cancelled: boolean }> {
   const routine = readCheckRoutine(home, checkRoutineId);
   if (!routine) return { cancelled: false };
   if (routine.purpose === "pr-watch") return { cancelled: false };
-  return { cancelled: deleteCheck(home, checkRoutineId).deleted };
+  return { cancelled: (await deleteCheck(home, checkRoutineId, clock)).deleted };
 }
 
 export function retargetAsPrWatch(home: string, lease: Lease): { checkRoutineId: string } {
   const checkRoutineId = lease.checkRoutineId ?? checkRoutineIdFor(lease.key);
   const path = checkRoutinePath(home, checkRoutineId);
+  const existing = readCheckRoutine(home, checkRoutineId);
   mkdirSync(dirname(path), { recursive: true });
   const routine: CheckRoutine = {
     id: checkRoutineId,
@@ -169,6 +278,7 @@ export function retargetAsPrWatch(home: string, lease: Lease): { checkRoutineId:
     specId: lease.specId,
     intervalMinutes: 30,
     purpose: "pr-watch",
+    handle: existing?.handle ?? "",
   };
   writeFileSync(path, `${JSON.stringify(routine, null, 2)}\n`);
   return { checkRoutineId };
@@ -460,6 +570,7 @@ async function postAndPersist(
     ref: LaunchRef;
     post: (payload: LaunchPayload) => Promise<{ runId: string }>;
     createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+    clock?: CheckClock;
     stopAgent?: (runId: string) => Promise<void>;
   },
   lease: Lease,
@@ -499,6 +610,7 @@ async function persistRunAndCheck(
     repo: string;
     specId: string;
     createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+    clock?: CheckClock;
     stopAgent?: (runId: string) => Promise<void>;
   },
   lease: Lease,
@@ -509,7 +621,10 @@ async function persistRunAndCheck(
     await recordRunId(opts.home, opts.repo, opts.specId, runId);
     const createCheck =
       opts.createCheck ??
-      (async (next: Lease) => createNamedCheck(opts.home, next));
+      (async (next: Lease) => {
+        if (!opts.clock) return { error: "cannot_create" as const };
+        return createNamedCheck(opts.home, next, opts.clock);
+      });
     const check = await createCheck({ ...lease, runId });
     if ("error" in check) {
       await stopThenMaybeClear({ ...opts, runId });
@@ -537,6 +652,7 @@ export async function pickupAndLaunch(opts: {
   canLaunch: boolean;
   post: (payload: LaunchPayload) => Promise<{ runId: string }>;
   createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  clock?: CheckClock;
   stopAgent?: (runId: string) => Promise<void>;
   continueFlight?: boolean;
 }): Promise<PickupResult> {
@@ -564,7 +680,11 @@ export async function pickupAndLaunch(opts: {
       }, existing.runId);
     }
     if (opts.continueFlight) {
-      cancelBuildRunCheck(opts.home, leaseCheckId(existing, opts.repo, opts.specId));
+      await cancelBuildRunCheck(
+        opts.home,
+        leaseCheckId(existing, opts.repo, opts.specId),
+        opts.clock,
+      );
       const nextClientId = clientAgentIdFor(`${existing.key}:${existing.runId ?? "0"}`);
       return postAndPersist(opts, existing, job, nextClientId);
     }
@@ -586,6 +706,7 @@ export async function pickupReadySpecs(opts: {
   canLaunch: boolean;
   post: (payload: LaunchPayload) => Promise<{ runId: string }>;
   createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  clock?: CheckClock;
   stopAgent?: (runId: string) => Promise<void>;
 }): Promise<PickupResult[]> {
   loadLiveHowToRun(opts.home, opts.templatePath);
@@ -621,14 +742,20 @@ export type ArtifactReader = (input: {
 
 export type DoneWakeResult =
   | { status: "unknown"; cancelled: true; runStatus: RunStatus }
-  | { status: "continue"; cancelled: true; runStatus: RunStatus; artifact: WakeArtifact }
+  | {
+      status: "continue";
+      cancelled: true;
+      runStatus: RunStatus;
+      artifact: WakeArtifact;
+      reason?: "missed-wake";
+    }
   | { status: "judge"; cancelled: boolean }
   | { status: "stale"; cancelled: false };
 
 export type CheckFireResult =
   | { status: "stop"; deleted: true; reason: "merged_or_cleared" | "orphan" }
   | { status: "pr-watch-or-fix"; deleted: false }
-  | { status: "judge"; deleted: false }
+  | { status: "hang"; deleted: false; notify: "NEEDS_HUMAN" }
   | DoneWakeResult;
 
 function leaseCheckId(lease: Lease | undefined, repo: string, specId: string): string {
@@ -643,6 +770,7 @@ async function afterCancelledBuildRun(opts: {
   runStatus: RunStatus;
   readArtifact: ArtifactReader;
   expectedRunId?: string;
+  clock?: CheckClock;
 }): Promise<DoneWakeResult> {
   const paths = botPaths(opts.home);
   const key = leaseKey(opts.repo, opts.specId);
@@ -650,7 +778,7 @@ async function afterCancelledBuildRun(opts: {
   if (opts.expectedRunId && lease?.runId !== opts.expectedRunId) {
     return { status: "stale", cancelled: false };
   }
-  cancelBuildRunCheck(opts.home, leaseCheckId(lease, opts.repo, opts.specId));
+  await cancelBuildRunCheck(opts.home, leaseCheckId(lease, opts.repo, opts.specId), opts.clock);
   if (opts.runStatus === "RUNNING") return { status: "judge", cancelled: true };
   const artifact = await opts.readArtifact({ hint: opts.hint, runStatus: opts.runStatus });
   if (!artifact) return { status: "unknown", cancelled: true, runStatus: opts.runStatus };
@@ -665,6 +793,7 @@ export async function handleDoneWake(opts: {
   hint: WakeHint;
   getRun: (runId: string) => Promise<{ status: RunStatus }>;
   readArtifact: ArtifactReader;
+  clock?: CheckClock;
 }): Promise<DoneWakeResult> {
   const paths = botPaths(opts.home);
   const key = leaseKey(opts.repo, opts.specId);
@@ -673,7 +802,7 @@ export async function handleDoneWake(opts: {
     return { status: "stale", cancelled: false };
   }
   const checkRoutineId = leaseCheckId(lease, opts.repo, opts.specId);
-  cancelBuildRunCheck(opts.home, checkRoutineId);
+  await cancelBuildRunCheck(opts.home, checkRoutineId, opts.clock);
   try {
     const run = await opts.getRun(opts.runId);
     return afterCancelledBuildRun({
@@ -684,9 +813,10 @@ export async function handleDoneWake(opts: {
       runStatus: run.status,
       readArtifact: opts.readArtifact,
       expectedRunId: opts.runId,
+      clock: opts.clock,
     });
   } catch {
-    createNamedCheck(opts.home, lease);
+    if (opts.clock) await createNamedCheck(opts.home, lease, opts.clock);
     return { status: "judge", cancelled: false };
   }
 }
@@ -700,6 +830,7 @@ export async function handleCheckFire(opts: {
   hasOpenUnmergedPr: boolean;
   getRun: (runId: string) => Promise<{ status: RunStatus }>;
   readArtifact?: ArtifactReader;
+  clock?: CheckClock;
 }): Promise<CheckFireResult> {
   const paths = botPaths(opts.home);
   const key = leaseKey(opts.repo, opts.specId);
@@ -708,7 +839,7 @@ export async function handleCheckFire(opts: {
   const purpose = readCheckRoutine(opts.home, checkRoutineId)?.purpose;
 
   if (opts.specStatus !== "open" || opts.leaseCleared || !lease) {
-    deleteCheck(opts.home, checkRoutineId);
+    await deleteCheck(opts.home, checkRoutineId, opts.clock);
     if (lease && opts.specStatus !== "open") {
       await clearLease(opts.home, opts.repo, opts.specId);
     }
@@ -717,7 +848,7 @@ export async function handleCheckFire(opts: {
 
   if (purpose === "pr-watch") {
     if (opts.hasOpenUnmergedPr) return { status: "pr-watch-or-fix", deleted: false };
-    deleteCheck(opts.home, checkRoutineId);
+    await deleteCheck(opts.home, checkRoutineId, opts.clock);
     await clearLease(opts.home, opts.repo, opts.specId);
     return { status: "stop", deleted: true, reason: "orphan" };
   }
@@ -733,6 +864,7 @@ export async function handleCheckFire(opts: {
       runStatus: run.status,
       readArtifact: opts.readArtifact ?? (async () => null),
       expectedRunId: observedRunId,
+      clock: opts.clock,
     });
   }
 
@@ -741,13 +873,18 @@ export async function handleCheckFire(opts: {
     return { status: "pr-watch-or-fix", deleted: false };
   }
 
-  if (run.status !== "RUNNING") {
-    deleteCheck(opts.home, checkRoutineId);
-    await clearLease(opts.home, opts.repo, opts.specId);
-    return { status: "stop", deleted: true, reason: "orphan" };
+  if (run.status === "RUNNING") {
+    return { status: "hang", deleted: false, notify: "NEEDS_HUMAN" };
   }
 
-  return { status: "judge", deleted: false };
+  await cancelBuildRunCheck(opts.home, checkRoutineId, opts.clock);
+  return {
+    status: "continue",
+    cancelled: true,
+    runStatus: run.status,
+    reason: "missed-wake",
+    artifact: { kind: "git", summary: "missed-wake" },
+  };
 }
 
 export type StayAction = "retry" | "next-job" | "merge" | "fix-agent" | "ask" | "ping" | "hold";
@@ -762,6 +899,7 @@ export type JudgeInput = {
   prMergeable?: boolean;
   ciOrReviewNeedsFix?: boolean;
   ownerAsk?: boolean;
+  hang?: boolean;
   stuck?: boolean;
   retryable?: boolean;
   rounds?: number;
@@ -798,6 +936,7 @@ export function judgeStay(input: JudgeInput): JudgeVerdict {
   });
 
   if (input.ownerAsk) return finish("ask");
+  if (input.hang) return finish("ping");
   if (input.stuck) return finish("ping");
   if (input.stillRunning || !input.readable) return finish("hold");
   if (input.retryable) return finish("retry");
@@ -839,6 +978,7 @@ export async function completeStay(opts: {
   canLaunch: boolean;
   post: (payload: LaunchPayload) => Promise<{ runId: string }>;
   createCheck?: (lease: Lease) => Promise<{ checkRoutineId: string } | { error: "cannot_create" }>;
+  clock?: CheckClock;
   stopAgent?: (runId: string) => Promise<void>;
 }): Promise<StayCompletion> {
   void opts.readyInOtherRepos;
@@ -861,6 +1001,7 @@ export async function completeStay(opts: {
           canLaunch: opts.canLaunch,
           post: opts.post,
           createCheck: opts.createCheck,
+          clock: opts.clock,
           stopAgent: opts.stopAgent,
           continueFlight: true,
         }),
@@ -870,7 +1011,7 @@ export async function completeStay(opts: {
     const key = leaseKey(opts.firingRepo, opts.specId);
     const lease = readLedgerFile(botPaths(opts.home).ledger).leases[key];
     const checkId = leaseCheckId(lease, opts.firingRepo, opts.specId);
-    deleteCheck(opts.home, checkId);
+    await deleteCheck(opts.home, checkId, opts.clock);
     await clearLease(opts.home, opts.firingRepo, opts.specId);
     leaseCleared = true;
     checkDisabled = readCheckRoutine(opts.home, checkId) === null;
@@ -882,6 +1023,7 @@ export async function completeStay(opts: {
       canLaunch: opts.canLaunch,
       post: opts.post,
       createCheck: opts.createCheck,
+      clock: opts.clock,
       stopAgent: opts.stopAgent,
     });
   }

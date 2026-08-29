@@ -31,7 +31,7 @@ Install the same factory-forward Action and the two secrets on the new `owner/na
 1. Exec `factory/gate.ts` on the wake (push body or Cursor envelope). No model.
 2. If none ready (exit 0): stop. No status ping.
 3. If stuck (exit 20): notify `NEEDS_HUMAN` (builder → main → human). Preserve the reason.
-4. If start (exit 10): enable the coordinator skill (`skills/factory-coordinator/SKILL.md`), which launches Cursor Cloud Agents for named build jobs. Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin.
+4. If start (exit 10): enable the coordinator skill (`skills/factory-coordinator/SKILL.md`), which launches Cursor Cloud Agents for named build jobs. The factory does not call `/land`. The coordinator merges. Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin.
 
 ## Notify
 

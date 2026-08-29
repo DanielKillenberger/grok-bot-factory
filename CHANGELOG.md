@@ -9,7 +9,7 @@
 
 ### Changed
 
-- Advertised factory start is enable the coordinator skill (`skills/factory-coordinator/SKILL.md`), which launches Cursor Cloud Agents. Gate-first stays. The old tick runner stays in the tree unadvertised.
+- Advertised factory start is enable the coordinator skill (`skills/factory-coordinator/SKILL.md`), which launches Cursor Cloud Agents. Gate-first stays. The old tick runner stays in the tree unadvertised. The factory does not call `/land`; the coordinator merges. A 30-minute check must arm a real Grok Bot scheduled routine or re-POST the shipped factory webhook — a JSON ledger entry is not a clock. Hang (still RUNNING at check fire) pings. Missed wake (lease live, spec open, nothing running) continues from git.
 - `hostProbe` treats an inventory `grok` binary as a loop host even when `grok --help` omits `/loop` and `/goal` (Grok Build slash commands). Other inventory hosts still scan `--help`.
 - `hostRun` invokes basename `grok` via `script -q -e -f -c … <tick-home>/host.typescript` so grok has a PTY, with `--always-approve --no-alt-screen` and one prompt (`/loop 10m <skill>` or `/goal <skill>`). Missing `script(1)` is stuck. Other inventory hosts keep Claude-shaped split argv.
 - `hostRun` ends a grok host on the first `PILOT_VERDICT=` or `LAND_VERDICT=` line in the typescript or script stdout: SIGTERM the script/grok process group, return that line as stdout, exit 0. If grok exits first, return captured typescript/stdout. Timeout still SIGKILL.

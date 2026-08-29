@@ -15,7 +15,7 @@ import {
   type JudgeInput,
   type StayAction,
 } from "../../factory/lib/coordinator.ts";
-import { NOTIFY, ROOT, runBun, tempDir } from "./helpers.ts";
+import { NOTIFY, ROOT, memoryCheckClock, runBun, tempDir } from "./helpers.ts";
 
 const COORD_SKILL = join(ROOT, "skills/factory-coordinator/SKILL.md");
 const TEMPLATE = join(ROOT, "skills/factory-coordinator/assets/how-to-run.template.md");
@@ -31,9 +31,11 @@ const firstLaunch: ClassifyFields = {
 };
 
 let home = "";
+let clock = memoryCheckClock();
 
 beforeEach(() => {
   home = tempDir();
+  clock = memoryCheckClock();
 });
 
 afterEach(() => {
@@ -78,12 +80,23 @@ test("rounds and look-count never auto-ping", () => {
   expect(stillRunning.action).not.toBe("ping");
   expect(stillRunning.action).not.toBe("ask");
   expect(stillRunning.notify).toBe("quiet");
+
+  const hang = judgeStay({
+    readable: true,
+    hang: true,
+    lookCount: 1,
+    wallClockMs: 30 * 60 * 1000,
+  });
+  expect(hang.action).toBe("ping");
+  expect(hang.notify).toBe("NEEDS_HUMAN");
 });
 
 test("after make-pr the coordinator merges or sends a fix agent and does not invoke land", () => {
   const skill = readFileSync(COORD_SKILL, "utf8");
   expect(skill).toMatch(/After make-pr/);
   expect(skill).toMatch(/Do not invoke land/);
+  expect(skill).toMatch(/The factory does not call `\/land`/);
+  expect(skill).toMatch(/The coordinator merges/);
   expect(skill).toMatch(/Stopping at make-pr or PR-up fails the stay/);
 
   const merge = judgeStay({ readable: true, finishedJob: "make-pr", prMergeable: true });
@@ -149,6 +162,7 @@ test("escalate clears the lease and disables the check", async () => {
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => ({ runId: "run-escalate" }),
   });
   expect(launched.status).toBe("launched");
@@ -167,6 +181,7 @@ test("escalate clears the lease and disables the check", async () => {
       { specId: "fn-2", fields: firstLaunch, ref: { kind: "spec-branch", branch: "fn-2" } },
     ],
     canLaunch: true,
+    clock,
     post: async (payload) => {
       expect(payload.source.ref).not.toBe("fn-1");
       return { runId: `run-${payload.source.ref}` };
@@ -190,6 +205,7 @@ test("retry, next-job, and fix-agent launch on the same lease", async () => {
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-1" },
     canLaunch: true,
+    clock,
     post: async () => ({ runId: "run-plan" }),
   });
   expect(launched.status).toBe("launched");
@@ -208,6 +224,7 @@ test("retry, next-job, and fix-agent launch on the same lease", async () => {
     readyInFiringRepo: [],
     followUp: { specId: "fn-1", fields: afterPlan, ref: { kind: "spec-branch", branch: "fn-1" } },
     canLaunch: true,
+    clock,
     post: async (payload) => {
       posted.push(payload.prompt.text);
       return { runId: "run-plan-review" };
@@ -232,6 +249,7 @@ test("freed slot under 10 fills from the firing repo only; cap-full is quiet wai
     fields: firstLaunch,
     ref: { kind: "spec-branch", branch: "fn-leave" },
     canLaunch: true,
+    clock,
     post: async () => ({ runId: "run-leave" }),
   });
   expect(leaving.status).toBe("launched");
@@ -250,6 +268,7 @@ test("freed slot under 10 fills from the firing repo only; cap-full is quiet wai
       { specId: "fn-skip", fields: firstLaunch, ref: { kind: "spec-branch", branch: "fn-skip" } },
     ],
     canLaunch: true,
+    clock,
     post: async (payload) => {
       posted.push(`${payload.source.repository} ${payload.source.ref}`);
       return { runId: `run-${payload.source.ref}` };
