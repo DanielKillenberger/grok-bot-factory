@@ -20,9 +20,16 @@ export async function runGate(argv: string[]): Promise<void> {
   if (parsed.kind === "stuck") stuck(parsed.reason);
 
   const { full_name, after } = parsed.ident;
-  const mem = await membershipCheck(full_name, after);
+  const mem =
+    parsed.kind === "check"
+      ? await membershipCheck(full_name)
+      : await membershipCheck(full_name, after);
   if (mem.result === "quiet") quiet();
   if (mem.result === "stuck") stuck(mem.reason ?? "cannot decide membership");
+
+  if (parsed.kind === "check") {
+    start(`${full_name} ${after} check ${parsed.specId}`);
+  }
 
   const ready = await readySelect(full_name, after);
   if (ready.quiet) quiet();

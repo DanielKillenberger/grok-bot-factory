@@ -8,6 +8,7 @@ import {
   ROOT,
   SHA,
   SKILL,
+  SKILL_EASY_INSTALL,
   STUB_GH,
   STUB_HOST,
   TICK,
@@ -276,7 +277,8 @@ test("README contracts", () => {
   expect(
     /easy-install is later/i.test(readme) || /not required/i.test(readme),
   ).toBe(true);
-  expect(readme.toLowerCase()).toContain("instance host cli");
+  expect(readme.toLowerCase()).toContain("coordinator skill");
+  expect(readme).toMatch(/Cursor Cloud Agents/);
   expect(readme.toLowerCase()).toContain("review pin");
   expect(readme.toLowerCase()).toContain("do not arm");
   expect(/don't arm|does not arm|do not arm/i.test(changelog)).toBe(true);
@@ -313,6 +315,22 @@ test("README contracts", () => {
   expect(easy.toLowerCase()).toMatch(/throwaway product repo/);
   expect(easy.toLowerCase()).toMatch(/second main/);
   expect(easy.toLowerCase()).toMatch(/shared computer and github/);
+});
+
+test("README and easy-install advertise coordinator skill start, not factory/tick.ts", () => {
+  const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+  const changelog = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
+  const easySkill = readFileSync(SKILL_EASY_INSTALL, "utf8");
+  for (const text of [readme, easySkill]) {
+    expect(text).toMatch(/coordinator skill/);
+    expect(text).toMatch(/Cursor Cloud Agents/);
+    expect(text).not.toMatch(/factory\/tick\.ts/);
+  }
+  expect(easySkill).toMatch(/Cloud Agent capability/);
+  expect(easySkill).toMatch(/team toggle/);
+  expect(easySkill).toMatch(/Do not paste a Cloud Agent API key/);
+  expect(changelog).toMatch(/coordinator skill/);
+  expect(changelog).toMatch(/Cursor Cloud Agents/);
 });
 
 test("README Easy-install documents post-tick commit/push; ADVANCED dirty/unpushed is fail", () => {

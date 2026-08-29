@@ -1,10 +1,10 @@
 # grok-bot-factory
 
-This repo ships the factory program: a deterministic wake gate, an isolated tick runner, and stuck/owner-gated notify. Grok Bot skills invoke that program; they are not a substitute for the gate.
+This repo ships the factory program: a deterministic wake gate, a coordinator skill that launches Cursor Cloud Agents, and stuck/owner-gated notify. Grok Bot skills invoke that program; they are not a substitute for the gate.
 
 Copy these steps. Easy-install (send this repo to **main**) is optional; hand-wire below is enough. A dashboard is welcome later.
 
-The **builder** Grok Bot owns the webhook routine and supervises. Product work happens in a documented flow-next host (`/loop` or `/goal` calling `/flow-next:pilot` or `/flow-next:land`), not in Grok Bot chat. The host CLI is instance-configurable (flag/env; default = a documented host already on the builder machine). The product review pin is the checkout’s `.flow/config.json` `review.backend` plus instruction-file routing — not the host CLI, and not a hardcoded review model.
+The **builder** Grok Bot owns the webhook routine and supervises. Product work happens in Cursor Cloud Agents launched by the coordinator skill, not in Grok Bot chat. The product review pin is the checkout’s `.flow/config.json` `review.backend` plus instruction-file routing — not a hardcoded review model.
 
 ## Queue
 
@@ -20,7 +20,7 @@ The factory is any repo you push to. Not a named-repo allowlist.
 
 The factory program is TypeScript on Bun. The routine’s **first action** is exec of `factory/gate.ts` — no model (`bun factory/gate.ts`, or the file shebang). If the routine panel cannot exec a command before a model, stop (do not start a model to run the gate).
 
-On fire: if the gate is quiet, stay quiet. If it starts, the builder runs `factory/tick.ts` on an isolated worktree via the instance host CLI. Stay quiet unless a human decision is needed.
+On fire: if the gate is quiet, stay quiet. If it starts, the builder enables the coordinator skill, which launches Cursor Cloud Agents. Stay quiet unless a human decision is needed.
 
 ## Add a repo
 
@@ -31,10 +31,7 @@ Install the same factory-forward Action and the two secrets on the new `owner/na
 1. Exec `factory/gate.ts` on the wake (push body or Cursor envelope). No model.
 2. If none ready (exit 0): stop. No status ping.
 3. If stuck (exit 20): notify `NEEDS_HUMAN` (builder → main → human). Preserve the reason.
-4. If start (exit 10): new isolated worktree, run `factory/tick.ts` via the instance host CLI (flag/env; default = a documented host already on this machine). Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin. Do not infer the host from `review.backend`.
-5. Cloud Agents only if that instance host CLI cannot run.
-
-`/flow-next:pilot` is one tick. `/loop` or `/goal` calls it each tick until `NO_WORK`, `NEEDS_HUMAN`, or `DEFERRED_TO_LAND`.
+4. If start (exit 10): enable the coordinator skill (`skills/factory-coordinator/SKILL.md`), which launches Cursor Cloud Agents for named build jobs. The factory does not call `/land`. The coordinator merges. Review pin is the product checkout’s `.flow/config.json` `review.backend` plus instruction-file routing. Do not overwrite the pin.
 
 ## Notify
 
@@ -51,9 +48,9 @@ Send this repo to your **main** Grok Bot agent. Easy-install is optional and not
 3. **You pick** — You choose the set. Named repo without `.flow/`: ask intent and whether `/flow-next:setup`; never auto-init, never silent skip. Wait for an explicit confirmation reply naming the set.
 4. **Builder/webhook** — One builder, one webhook for all Actions. Assign an existing builder; create one only if none exists. Do not mint a second routine.
 5. **Paste two secrets** — GitHub never shows secret values. Paste `GROK_BOT_WEBHOOK_URL` and `GROK_BOT_SENDER_KEY` from the routine panel, then install the factory-forward Action on the confirmed set. Not Settings hooks.
-6. **Done** — The fire path exists; ticks are the factory program above. After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. Stop. Do not recap.
+6. **Done** — The fire path exists; start is enable the coordinator skill, which launches Cursor Cloud Agents. After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success. Stop. Do not recap.
 
-Main supervises setup only. The routine’s first action is still `bun factory/gate.ts` (no model), then `factory/tick.ts` with the instance host CLI. Do not overwrite a product repo’s flow-next:setup review pin.
+Main supervises setup only. The routine’s first action is still `bun factory/gate.ts` (no model). Then enable the coordinator skill, which launches Cursor Cloud Agents. Confirm the Grok Bot native Cloud Agent capability (team toggle that Bots can launch Cursor cloud agents) is on. Do not paste a Cloud Agent API key. Do not overwrite a product repo’s flow-next:setup review pin.
 
 Later-proof (document now, run after the skill ships). Same-account: a second main on the same account, throwaway product repo, shared computer and GitHub, no second login. Do not arm live factory-wake. Never reuse the live factory builder, the live factory-wake webhook, or live secrets.
 

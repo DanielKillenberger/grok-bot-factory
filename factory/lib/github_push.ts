@@ -25,11 +25,15 @@ function okRef(v: unknown): v is string {
 
 export type ParseResult =
   | { kind: "ok"; ident: PushIdentity }
+  | { kind: "check"; ident: PushIdentity; specId: string }
   | { kind: "quiet" }
   | { kind: "stuck"; reason: string };
 
 const UA_RE =
   /factory-forward repo=([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+) sha=([0-9a-f]{40}) ref=(\S+)/;
+
+const CHECK_UA_RE =
+  /factory-check repo=([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+) spec=([A-Za-z0-9._-]+) sha=([0-9a-f]{40}) ref=(\S+)/;
 
 function headerUserAgent(headers: unknown): string | undefined {
   if (isRecord(headers)) {
@@ -54,7 +58,22 @@ function headerUserAgent(headers: unknown): string | undefined {
   return undefined;
 }
 
+function fromCheckUserAgent(ua: string): ParseResult | null {
+  const m = ua.match(CHECK_UA_RE);
+  if (!m) return null;
+  const full_name = m[1];
+  const specId = m[2];
+  const after = m[3];
+  const ref = m[4];
+  if (!isRepoFullName(full_name) || !specId || !SHA_RE.test(after) || !okRef(ref)) {
+    return { kind: "stuck", reason: "identity: malformed factory-check User-Agent" };
+  }
+  return { kind: "check", ident: { full_name, after, ref, deleted: false }, specId };
+}
+
 function fromUserAgent(ua: string): ParseResult {
+  const check = fromCheckUserAgent(ua);
+  if (check) return check;
   const m = ua.match(UA_RE);
   if (!m) return { kind: "stuck", reason: "identity: no factory-forward User-Agent" };
   const full_name = m[1];

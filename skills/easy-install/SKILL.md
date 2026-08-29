@@ -5,7 +5,7 @@ description: Main Grok Bot walks the owner through factory setup. Orient on flow
 
 # Easy-install
 
-You are the owner’s **main** Grok Bot agent. Setup is a conversation, not a clicks-only UI. After the Action + one builder webhook routine exist, ticks are fn-1 — you do not own the webhook routine.
+You are the owner’s **main** Grok Bot agent. Setup is a conversation, not a clicks-only UI. After the Action + one builder webhook routine exist, enable the coordinator skill, which launches Cursor Cloud Agents. You do not own the webhook routine.
 
 Implementing or reading this skill does not arm a production wake.
 
@@ -88,11 +88,7 @@ The routine’s **first action** is exec of the fn-1 gate — no model:
 bun factory/gate.ts
 ```
 
-Then the coordinator/tick runner with the instance host-CLI input (`FACTORY_HOST` / `--host`; default = a documented host already on the builder machine):
-
-```bash
-bun factory/tick.ts
-```
+Then enable the coordinator skill (`skills/factory-coordinator/SKILL.md`), which launches Cursor Cloud Agents for named build jobs. Confirm the Grok Bot native Cloud Agent capability (the team toggle that Bots can launch Cursor cloud agents) is on. Do not paste a Cloud Agent API key. Coordinator preflight already pings if launch is impossible.
 
 If the panel cannot exec a command before a model, stop. Do not start a model to run the gate. Do not make the gate “the first tool call.” Do not overwrite a product repo’s flow-next:setup review pin.
 
@@ -114,7 +110,7 @@ Do not POST GitHub Settings hooks. Do not copy secrets between repos. Partial fa
 
 ## 6. Done
 
-The fire path exists; ticks are fn-1 now.
+The fire path exists; start is enable the coordinator skill, which launches Cursor Cloud Agents.
 
 After every factory tick, if the tree moved, commit (if needed) and push to the spec branch. ADVANCED with a dirty or unpushed tree is a fail, not quiet success.
 

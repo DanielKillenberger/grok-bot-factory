@@ -129,7 +129,7 @@ test("after confirm, only the confirmed set is mutated", async () => {
   expect(body.succeeded).toEqual(["acme/app"]);
   expect(body.failed).toEqual([]);
   expect(body.routine_first_action).toBe("bun factory/gate.ts");
-  expect(body.coordinator).toBe("bun factory/tick.ts");
+  expect(body.coordinator).toBe("skills/factory-coordinator/SKILL.md");
   expect(body.model_first).toBe(false);
   expect(body.host).toBe("grok");
   expect(body.pin).toBe("keep");
