@@ -23,7 +23,7 @@
   "plan_review_rounds": 0,
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-08-28T23:12:41.151447Z",
-  "ready": false,
+  "ready": true,
   "review_attempts": [
     {
       "artifact_sha256": "225bafe8ca6fffa4d97e8f952fb0b2a8e50ffe83c6fb2846c0f8d6ca3e7157c6",
@@ -1124,7 +1124,7 @@
     "plan": 0
   },
   "spec_path": ".flow/specs/fn-4-factory-stay-worker.md",
-  "status": "open",
+  "status": "done",
   "title": "Factory stay worker",
   "tracker": {
     "baseHashFlow": null,
