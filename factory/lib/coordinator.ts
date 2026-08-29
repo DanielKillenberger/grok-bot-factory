@@ -406,6 +406,12 @@ export type PickupResult =
   | { status: "watch-or-fix" }
   | { status: "ping"; reason: "cannot_launch" | "check_create_failed" };
 
+export function isBusyLaunchError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const rec = err as { busy?: unknown; code?: unknown };
+  return rec.busy === true || rec.code === "agent_busy";
+}
+
 export type ReadySpec = {
   specId: string;
   fields: ClassifyFields;
@@ -430,12 +436,15 @@ export async function pickupAndLaunch(opts: {
     await clearLease(opts.home, opts.repo, opts.specId);
     return { status: "stop" };
   }
-  if (!opts.canLaunch) return { status: "ping", reason: "cannot_launch" };
   if (job === "watch-or-fix") return { status: "watch-or-fix" };
 
   const reserved = await reserveSlot(opts.home, opts.repo, opts.specId);
   if (reserved.status === "cap_full") return { status: "wait" };
   if (reserved.status === "already") return { status: "already", lease: reserved.lease };
+  if (!opts.canLaunch) {
+    await clearLease(opts.home, opts.repo, opts.specId);
+    return { status: "ping", reason: "cannot_launch" };
+  }
 
   const payload = buildLaunchPayload({
     repo: opts.repo,
@@ -443,23 +452,44 @@ export async function pickupAndLaunch(opts: {
     clientAgentId: reserved.lease.clientAgentId,
     prompt: promptForJob(job, opts.specId),
   });
-  const { runId } = await opts.post(payload);
-  await recordRunId(opts.home, opts.repo, opts.specId, runId);
-  const createCheck =
-    opts.createCheck ??
-    (async (lease: Lease) => createNamedCheck(opts.home, lease));
-  const check = await createCheck({ ...reserved.lease, runId });
-  if ("error" in check) {
+  let runId: string | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      ({ runId } = await opts.post(payload));
+      break;
+    } catch (err) {
+      if (isBusyLaunchError(err) && attempt === 0) continue;
+      await clearLease(opts.home, opts.repo, opts.specId);
+      return { status: "ping", reason: "cannot_launch" };
+    }
+  }
+  if (!runId) {
+    await clearLease(opts.home, opts.repo, opts.specId);
+    return { status: "ping", reason: "cannot_launch" };
+  }
+
+  try {
+    await recordRunId(opts.home, opts.repo, opts.specId, runId);
+    const createCheck =
+      opts.createCheck ??
+      (async (lease: Lease) => createNamedCheck(opts.home, lease));
+    const check = await createCheck({ ...reserved.lease, runId });
+    if ("error" in check) {
+      if (opts.stopAgent) await opts.stopAgent(runId);
+      await clearLease(opts.home, opts.repo, opts.specId);
+      return { status: "ping", reason: "check_create_failed" };
+    }
+    await recordCheckRoutineId(opts.home, opts.repo, opts.specId, check.checkRoutineId);
+    return {
+      status: "launched",
+      payload,
+      lease: { ...reserved.lease, runId, checkRoutineId: check.checkRoutineId },
+    };
+  } catch {
     if (opts.stopAgent) await opts.stopAgent(runId);
     await clearLease(opts.home, opts.repo, opts.specId);
     return { status: "ping", reason: "check_create_failed" };
   }
-  await recordCheckRoutineId(opts.home, opts.repo, opts.specId, check.checkRoutineId);
-  return {
-    status: "launched",
-    payload,
-    lease: { ...reserved.lease, runId, checkRoutineId: check.checkRoutineId },
-  };
 }
 
 export async function pickupReadySpecs(opts: {

@@ -271,6 +271,129 @@ test("cross-repo lease keys do not collide", async () => {
   expect(a.lease.clientAgentId).not.toBe(b.lease.clientAgentId);
 });
 
+test("in-flight later push is ignore even when launch is currently impossible", async () => {
+  const key = leaseKey("acme/app", "fn-1");
+  expect((await reserveSlot(home, "acme/app", "fn-1")).status).toBe("reserved");
+  let posted = false;
+  const again = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: false,
+    post: async () => {
+      posted = true;
+      return { runId: "should-not-post" };
+    },
+  });
+  expect(again.status).toBe("already");
+  expect(posted).toBe(false);
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]).toBeDefined();
+});
+
+test("new pickup that cannot launch pings and does not leave a reserved slot", async () => {
+  const key = leaseKey("acme/app", "fn-1");
+  const result = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: false,
+    post: async () => {
+      throw new Error("must not POST");
+    },
+  });
+  expect(result).toEqual({ status: "ping", reason: "cannot_launch" });
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]).toBeUndefined();
+});
+
+test("rejected launch POST and persist failures clear the lease and ping", async () => {
+  const key = leaseKey("acme/app", "fn-1");
+  const rejected = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => {
+      throw new Error("launch rejected");
+    },
+  });
+  expect(rejected).toEqual({ status: "ping", reason: "cannot_launch" });
+  expect(readLedgerFile(botPaths(home).ledger).leases[key]).toBeUndefined();
+
+  const persistHome = tempDir();
+  const stopped: string[] = [];
+  const persistFail = await pickupAndLaunch({
+    home: persistHome,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => ({ runId: "run-persist" }),
+    createCheck: async () => {
+      throw new Error("check persist failed");
+    },
+    stopAgent: async (runId) => {
+      stopped.push(runId);
+    },
+  });
+  expect(persistFail).toEqual({ status: "ping", reason: "check_create_failed" });
+  expect(stopped).toEqual(["run-persist"]);
+  expect(readLedgerFile(botPaths(persistHome).ledger).leases[key]).toBeUndefined();
+  rmSync(persistHome, { recursive: true, force: true });
+});
+
+test("busy-agent conflict retries once, then pings", async () => {
+  const key = leaseKey("acme/app", "fn-1");
+  const busy = Object.assign(new Error("agent busy"), { code: "agent_busy" });
+  let posts = 0;
+  const recovered = await pickupAndLaunch({
+    home,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => {
+      posts += 1;
+      if (posts === 1) throw busy;
+      return { runId: "run-retry" };
+    },
+  });
+  expect(recovered.status).toBe("launched");
+  expect(posts).toBe(2);
+
+  const failHome = tempDir();
+  posts = 0;
+  const exhausted = await pickupAndLaunch({
+    home: failHome,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-1",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-1" },
+    canLaunch: true,
+    post: async () => {
+      posts += 1;
+      throw busy;
+    },
+  });
+  expect(exhausted).toEqual({ status: "ping", reason: "cannot_launch" });
+  expect(posts).toBe(2);
+  expect(readLedgerFile(botPaths(failHome).ledger).leases[key]).toBeUndefined();
+  rmSync(failHome, { recursive: true, force: true });
+});
+
 test("cap slots are reserved under one atomic lock; an 11th in-flight spec never starts", async () => {
   const results = await Promise.all(
     Array.from({ length: FACTORY_CAP + 1 }, (_, i) => reserveSlot(home, "acme/app", `fn-${i}`)),

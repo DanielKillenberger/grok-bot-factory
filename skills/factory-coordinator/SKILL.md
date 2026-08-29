@@ -54,9 +54,9 @@ Reserve a factory slot under one atomic file lock on this Bot computer (same `wx
 
 ## Launch
 
-Auth is the Grok Bot native Cloud Agent capability. Preflight it. If it cannot launch, ping. No API-key paste.
+Auth is the Grok Bot native Cloud Agent capability. Resolve an existing lease before preflight. A later push of an in-flight spec is ignore, even when launch is currently impossible. Preflight new pickups. If a new pickup cannot launch, ping. No API-key paste.
 
-Launch on the spec branch with `work-on-current-branch` set, or on the PR head if a PR already exists. Do not continue on a generated cursor branch. If check create fails, stop that agent and ping.
+Launch on the spec branch with `work-on-current-branch` set, or on the PR head if a PR already exists. Do not continue on a generated cursor branch. A rejected launch POST clears the reserved slot and pings. A busy-agent conflict retries once, then pings. If persist or check create fails after launch, stop that agent, clear the lease, and ping.
 
 The testable pickup and wake contracts live in `factory/lib/coordinator.ts`.
 
