@@ -10,11 +10,13 @@ import {
   deleteCheck,
   handleCheckFire,
   handleDoneWake,
+  isArmedCheck,
   pickupAndLaunch,
   readCheckRoutine,
   readLedgerFile,
   recordRunId,
   retargetAsPrWatch,
+  type CheckClock,
   type ClassifyFields,
   type RunStatus,
 } from "../../factory/lib/coordinator.ts";
@@ -123,7 +125,97 @@ test("GET failure after cancel recreates the check so the hang detector stays", 
     clock,
   });
   expect(result).toEqual({ status: "judge", cancelled: false });
-  expect(readCheckRoutine(home, seeded.checkRoutineId)).not.toBeNull();
+  expect(isArmedCheck(readCheckRoutine(home, seeded.checkRoutineId))).toBe(true);
+  expect(readLedgerFile(botPaths(home).ledger).leases[`${seeded.repo} ${seeded.specId}`]).toBeDefined();
+
+  const refuse: CheckClock = {
+    arm: async () => ({ error: "cannot_create" }),
+    disarm: async () => ({ disarmed: true }),
+  };
+  const refused = await handleDoneWake({
+    home,
+    repo: seeded.repo,
+    specId: seeded.specId,
+    runId: seeded.lease.runId!,
+    hint: { finished: true },
+    getRun: async () => {
+      throw new Error("getRun failed again");
+    },
+    readArtifact: async () => ({ kind: "git", summary: "unused" }),
+    clock: refuse,
+  });
+  expect(refused).toEqual({
+    status: "ping",
+    notify: "NEEDS_HUMAN",
+    reason: "check_create_failed",
+  });
+  expect(readCheckRoutine(home, seeded.checkRoutineId)).toBeNull();
+  expect(readLedgerFile(botPaths(home).ledger).leases[`${seeded.repo} ${seeded.specId}`]).toBeDefined();
+});
+
+test("done-wake GET RUNNING re-arms the check; cannot_create pings and keeps the lease", async () => {
+  const skill = readFileSync(COORD_SKILL, "utf8");
+  expect(skill).toMatch(/GET fails or reports RUNNING/);
+  expect(skill).toMatch(/Do not hold without a live clock/);
+  expect(skill).toMatch(/Hang remains the 30-minute clock, not the done-wake/);
+
+  const seeded = await seedBuildRun("run-still-running");
+  const armsBefore = clock.arms.length;
+  const result = await handleDoneWake({
+    home,
+    repo: seeded.repo,
+    specId: seeded.specId,
+    runId: seeded.lease.runId!,
+    hint: { finished: true },
+    getRun: async () => ({ status: "RUNNING" }),
+    readArtifact: async () => ({ kind: "git", summary: "unused" }),
+    clock,
+  });
+  expect(result).toEqual({ status: "judge", cancelled: false });
+  expect(result.status).not.toBe("ping");
+  const routine = readCheckRoutine(home, seeded.checkRoutineId);
+  expect(isArmedCheck(routine)).toBe(true);
+  expect(routine?.purpose).toBe("build-run");
+  expect(clock.arms.length).toBeGreaterThan(armsBefore);
+  expect(readLedgerFile(botPaths(home).ledger).leases[`${seeded.repo} ${seeded.specId}`]).toBeDefined();
+
+  const refuseHome = tempDir();
+  const refuseClock = memoryCheckClock();
+  const launched = await pickupAndLaunch({
+    home: refuseHome,
+    templatePath: TEMPLATE,
+    repo: "acme/app",
+    specId: "fn-running-refuse",
+    fields: firstLaunch,
+    ref: { kind: "spec-branch", branch: "fn-running-refuse" },
+    canLaunch: true,
+    clock: refuseClock,
+    post: async () => ({ runId: "run-running-refuse" }),
+  });
+  expect(launched.status).toBe("launched");
+  if (launched.status !== "launched") throw new Error("expected launch");
+  const refuse: CheckClock = {
+    arm: async () => ({ error: "cannot_create" }),
+    disarm: async () => ({ disarmed: true }),
+  };
+  const refused = await handleDoneWake({
+    home: refuseHome,
+    repo: "acme/app",
+    specId: "fn-running-refuse",
+    runId: "run-running-refuse",
+    hint: { finished: true },
+    getRun: async () => ({ status: "RUNNING" }),
+    readArtifact: async () => ({ kind: "git", summary: "unused" }),
+    clock: refuse,
+  });
+  expect(refused).toEqual({
+    status: "ping",
+    notify: "NEEDS_HUMAN",
+    reason: "check_create_failed",
+  });
+  expect(readCheckRoutine(refuseHome, launched.lease.checkRoutineId!)).toBeNull();
+  expect(readLedgerFile(botPaths(refuseHome).ledger).leases["acme/app fn-running-refuse"]).toBeDefined();
+  rmSync(refuseHome, { recursive: true, force: true });
 });
 
 test("FINISHED with no readable artifact is unknown, not phase done", async () => {

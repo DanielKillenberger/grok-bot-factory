@@ -750,6 +750,7 @@ export type DoneWakeResult =
       reason?: "missed-wake";
     }
   | { status: "judge"; cancelled: boolean }
+  | { status: "ping"; notify: "NEEDS_HUMAN"; reason: "check_create_failed" }
   | { status: "stale"; cancelled: false };
 
 export type CheckFireResult =
@@ -760,6 +761,24 @@ export type CheckFireResult =
 
 function leaseCheckId(lease: Lease | undefined, repo: string, specId: string): string {
   return lease?.checkRoutineId ?? checkRoutineIdFor(leaseKey(repo, specId));
+}
+
+async function restoreHangCoverage(
+  home: string,
+  lease: Lease,
+  clock?: CheckClock,
+): Promise<
+  | { status: "judge"; cancelled: false }
+  | { status: "ping"; notify: "NEEDS_HUMAN"; reason: "check_create_failed" }
+> {
+  if (!clock) {
+    return { status: "ping", notify: "NEEDS_HUMAN", reason: "check_create_failed" };
+  }
+  const armed = await createNamedCheck(home, lease, clock);
+  if ("error" in armed) {
+    return { status: "ping", notify: "NEEDS_HUMAN", reason: "check_create_failed" };
+  }
+  return { status: "judge", cancelled: false };
 }
 
 async function afterCancelledBuildRun(opts: {
@@ -779,7 +798,12 @@ async function afterCancelledBuildRun(opts: {
     return { status: "stale", cancelled: false };
   }
   await cancelBuildRunCheck(opts.home, leaseCheckId(lease, opts.repo, opts.specId), opts.clock);
-  if (opts.runStatus === "RUNNING") return { status: "judge", cancelled: true };
+  if (opts.runStatus === "RUNNING") {
+    if (!lease) {
+      return { status: "ping", notify: "NEEDS_HUMAN", reason: "check_create_failed" };
+    }
+    return restoreHangCoverage(opts.home, lease, opts.clock);
+  }
   const artifact = await opts.readArtifact({ hint: opts.hint, runStatus: opts.runStatus });
   if (!artifact) return { status: "unknown", cancelled: true, runStatus: opts.runStatus };
   return { status: "continue", cancelled: true, runStatus: opts.runStatus, artifact };
@@ -816,8 +840,7 @@ export async function handleDoneWake(opts: {
       clock: opts.clock,
     });
   } catch {
-    if (opts.clock) await createNamedCheck(opts.home, lease, opts.clock);
-    return { status: "judge", cancelled: false };
+    return restoreHangCoverage(opts.home, lease, opts.clock);
   }
 }
 
